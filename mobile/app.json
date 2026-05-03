@@ -1,0 +1,28 @@
+{
+  "expo": {
+    "name": "GemMarket",
+    "slug": "gemmarket",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#0f172a"
+    },
+    "ios": { "supportsTablet": true },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#0f172a"
+      },
+      "permissions": ["READ_EXTERNAL_STORAGE", "WRITE_EXTERNAL_STORAGE"]
+    },
+    "plugins": [
+      [
+        "expo-image-picker",
+        { "photosPermission": "GemMarket needs access to your photos so admins can upload gem images." }
+      ]
+    ],
+    "extra": {}
+  }
+}
