@@ -14,9 +14,15 @@ android/
 coverage/
 
 # ===== EXCLUDE ALL FILES BY DEFAULT =====
-# This ensures only explicitly whitelisted marketplace/offer files are tracked
+# Track ONLY backend and frontend code files for marketplace/offer components
 
-# Ignore all in backend except marketplace/offer components
+# EXCLUDE ALL DOCUMENTATION & MARKDOWN
+*.md
+docs/
+__MACOSX/
+e2e/
+
+# BACKEND - MARKETPLACE/OFFER ONLY
 backend/**
 !backend/controllers/marketplaceController.js
 !backend/controllers/offerController.js
@@ -52,7 +58,7 @@ backend/**
 !backend/package.json
 !backend/server.js
 
-# Ignore all in mobile except marketplace/offer components
+# MOBILE FRONTEND - MARKETPLACE/OFFER ONLY
 mobile/**
 !mobile/src/screens/marketplace/
 !mobile/src/screens/offers/
@@ -63,39 +69,12 @@ mobile/**
 !mobile/src/api/index.js
 !mobile/src/utils/upload.js
 
-!mobile/src/components/Card.js
-!mobile/src/components/Button.js
-!mobile/src/components/GradientButton.js
-!mobile/src/components/Badge.js
-!mobile/src/components/StarRating.js
-!mobile/src/components/RatingBadge.js
-!mobile/src/components/PhotoLightbox.js
-!mobile/src/components/Input.js
-!mobile/src/components/Chip.js
-!mobile/src/components/EmptyState.js
-!mobile/src/components/Toast.js
-!mobile/src/components/Screen.js
-!mobile/src/components/AnimatedListItem.js
-!mobile/src/components/StatusTracker.js
-
+!mobile/src/context/AuthContext.js
 !mobile/src/stripe/index.native.js
 !mobile/src/stripe/index.web.js
-
-!mobile/src/context/AuthContext.js
 !mobile/src/theme.js
 
 !mobile/package.json
 !mobile/app.json
 !mobile/App.js
 !mobile/babel.config.js
-
-# E2E Tests for marketplace and offers
-!e2e/tests/03-marketplace-browse.spec.js
-!e2e/tests/04-offers-flow.spec.js
-!e2e/package.json
-!e2e/playwright.config.js
-
-# Documentation
-!docs/schema.md
-!GemMarket*.md
-!README.md
