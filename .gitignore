@@ -1,5 +1,8 @@
-# STANDARD IGNORES
+e2e
 node_modules/
+backend/node_modules/
+mobile/node_modules/
+e2e/node_modules/
 .env
 .env.local
 .expo/
@@ -12,18 +15,29 @@ ios/
 android/
 .vscode/
 coverage/
-
-# ===== EXCLUDE ALL FILES BY DEFAULT =====
-# Track ONLY backend and frontend code files for marketplace/offer components
-
-# EXCLUDE ALL DOCUMENTATION & MARKDOWN
-*.md
-docs/
 __MACOSX/
-e2e/
 
-# BACKEND - MARKETPLACE/OFFER ONLY
-backend/**
+# Ignore all documentation and markdown by default
+*.md
+docs/**/*
+
+# =================================================================
+# WHITELISTING LOGIC (Track ONLY what we need)
+# =================================================================
+
+# --- BACKEND ---
+# Ignore all files in backend but keep the folder structure
+backend/**/*
+
+# Whitelist Backend Folder Structure
+!backend/controllers/
+!backend/models/
+!backend/routes/
+!backend/utils/
+!backend/middleware/
+!backend/config/
+
+# Whitelist Specific Backend Files
 !backend/controllers/marketplaceController.js
 !backend/controllers/offerController.js
 !backend/controllers/paymentController.js
@@ -58,23 +72,58 @@ backend/**
 !backend/package.json
 !backend/server.js
 
-# MOBILE FRONTEND - MARKETPLACE/OFFER ONLY
-mobile/**
+# --- MOBILE FRONTEND ---
+# Ignore all files in mobile but keep folder structure
+mobile/**/*
+
+# Whitelist Mobile Folders
+!mobile/src/
+!mobile/src/screens/
 !mobile/src/screens/marketplace/
 !mobile/src/screens/offers/
 !mobile/src/screens/orders/
 !mobile/src/screens/payment/
+!mobile/src/components/
+!mobile/src/api/
+!mobile/src/utils/
+!mobile/src/context/
+!mobile/src/stripe/
 
+# Whitelist Specific Mobile Components
+!mobile/src/components/Card.js
+!mobile/src/components/Button.js
+!mobile/src/components/GradientButton.js
+!mobile/src/components/Badge.js
+!mobile/src/components/StarRating.js
+!mobile/src/components/RatingBadge.js
+!mobile/src/components/PhotoLightbox.js
+!mobile/src/components/Input.js
+!mobile/src/components/Chip.js
+!mobile/src/components/EmptyState.js
+!mobile/src/components/Toast.js
+!mobile/src/components/Screen.js
+!mobile/src/components/AnimatedListItem.js
+!mobile/src/components/StatusTracker.js
+
+# Whitelist Other Mobile Essentials
 !mobile/src/api/client.js
 !mobile/src/api/index.js
 !mobile/src/utils/upload.js
-
-!mobile/src/context/AuthContext.js
 !mobile/src/stripe/index.native.js
 !mobile/src/stripe/index.web.js
+!mobile/src/context/AuthContext.js
 !mobile/src/theme.js
-
 !mobile/package.json
 !mobile/app.json
 !mobile/App.js
 !mobile/babel.config.js
+
+# --- E2E & DOCS ---
+!e2e/tests/03-marketplace-browse.spec.js
+!e2e/tests/04-offers-flow.spec.js
+!e2e/package.json
+!e2e/playwright.config.js
+
+!docs/schema.md
+!GemMarket*.md
+!README.md
