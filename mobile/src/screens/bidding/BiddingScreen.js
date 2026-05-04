@@ -1,3 +1,10 @@
+/**
+ * BiddingScreen — Auctions (M5)
+ * Public list of bids. Each card: gem photo, status badge (LIVE /
+ * SCHEDULED / ENDED), highest bid, countdown timer (active) or start
+ * date (scheduled). Calls bids.list(); the server runs the lazy state
+ * sweep before returning.
+ */
 import { useState, useCallback } from 'react';
 import { Text, FlatList, View, StyleSheet, Image } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
@@ -52,9 +59,13 @@ export default function BiddingScreen({ navigation }) {
           <AnimatedListItem index={index}>
             <Card padded={false} onPress={() => navigation.navigate('BidDetail', { id: item._id })}>
               <View style={{ flexDirection: 'row' }}>
-                <View style={styles.left}>
-                  <Text style={{ fontSize: 36 }}>💎</Text>
-                </View>
+                {item.gem?.photos?.[0] ? (
+                  <Image source={{ uri: item.gem.photos[0] }} style={styles.left} />
+                ) : (
+                  <View style={[styles.left, { alignItems: 'center', justifyContent: 'center' }]}>
+                    <Text style={{ fontSize: 36 }}>💎</Text>
+                  </View>
+                )}
                 <View style={{ flex: 1, padding: 14 }}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <View style={{ flex: 1 }}>
@@ -107,7 +118,7 @@ const styles = StyleSheet.create({
   header: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 12 },
   h1: { ...type.display, color: colors.text },
   sub: { color: colors.textDim, fontSize: 14, marginTop: 4 },
-  left: { width: 96, backgroundColor: colors.surfaceAlt, alignItems: 'center', justifyContent: 'center' },
+  left: { width: 96, height: 96, backgroundColor: colors.surfaceAlt },
   name: { color: colors.text, fontSize: 16, fontWeight: '700' },
   meta: { color: colors.textDim, fontSize: 12, marginTop: 2 },
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: 12 },

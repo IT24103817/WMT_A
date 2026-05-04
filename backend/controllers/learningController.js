@@ -1,6 +1,27 @@
+/**
+ * LEARNING HUB CONTROLLER (Module M2)
+ * ===================================
+ * Module owner: M2
+ *
+ * What this file does:
+ *   Educational articles with cover images. Public read; admin write.
+ *
+ * Categories (4):
+ *   "Gem Types", "Buying Guide", "Grading & Quality", "Care & Maintenance"
+ *   Defined as an enum on the Article model — see models/Article.js.
+ *
+ * Why an enum and not free text?
+ *   The mobile app shows category filter chips. If admins typed
+ *   "Buying  Guide" with two spaces it would silently break grouping.
+ */
+
 const Article = require('../models/Article');
 const { ARTICLE_CATEGORIES } = require('../models/Article');
 
+/**
+ * READ-all → GET /api/learning?category=...
+ * Optionally filtered by category. Newest first.
+ */
 exports.list = async (req, res, next) => {
   try {
     const filter = {};
@@ -10,6 +31,9 @@ exports.list = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+/**
+ * READ-one → GET /api/learning/:id
+ */
 exports.get = async (req, res, next) => {
   try {
     const article = await Article.findById(req.params.id);
@@ -18,6 +42,14 @@ exports.get = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+/**
+ * CREATE → POST /api/learning  (multipart, admin)
+ * Validations:
+ *   - title, category, body required
+ *   - category must be one of ARTICLE_CATEGORIES
+ *   - cover image (optional) goes through multer → Cloudinary;
+ *     we save the resulting URL on the doc.
+ */
 exports.create = async (req, res, next) => {
   try {
     const { title, category, body } = req.body;
@@ -41,6 +73,11 @@ exports.create = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+/**
+ * UPDATE → PUT /api/learning/:id  (multipart, admin)
+ * Edits any of title/category/body. New cover image (if uploaded) replaces
+ * the old URL — the old Cloudinary asset stays (we don't garbage-collect).
+ */
 exports.update = async (req, res, next) => {
   try {
     const article = await Article.findById(req.params.id);
@@ -59,6 +96,11 @@ exports.update = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+/**
+ * DELETE → DELETE /api/learning/:id  (admin)
+ * Hard delete from Mongo. The Cloudinary cover image stays — Cloudinary
+ * cleanup is out of scope for this academic project.
+ */
 exports.remove = async (req, res, next) => {
   try {
     const article = await Article.findByIdAndDelete(req.params.id);
@@ -67,4 +109,8 @@ exports.remove = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+/**
+ * Helper → GET /api/learning/categories
+ * Lets the mobile UI render the chip filter from a single source of truth.
+ */
 exports.categories = (req, res) => res.json(ARTICLE_CATEGORIES);

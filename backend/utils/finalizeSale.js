@@ -1,3 +1,23 @@
+/**
+ * FINALIZE SALE (Module M6 — the choke-point)
+ * ============================================
+ *
+ * This is the SINGLE function that all 3 sale paths funnel through:
+ *   1. Direct cart purchase (source='direct')
+ *   2. Paid accepted offer  (source='offer')
+ *   3. Won bid              (source='bid')
+ *
+ * Why one function?
+ *   Each path has the SAME side effects:
+ *     - decrement the gem's stockQty by qty
+ *     - close the listing if stock depleted
+ *     - reject pending sibling offers
+ *     - create one Order document
+ *   Doing them in 3 separate places would be a maintenance nightmare and
+ *   would let inconsistencies creep in. The "choke point" pattern keeps
+ *   the rules in one file.
+ */
+
 const Gem = require('../models/Gem');
 const Listing = require('../models/Listing');
 const Offer = require('../models/Offer');
@@ -6,96 +26,6 @@ const Order = require('../models/Order');
 const generateOrderNumber = require('./generateOrderNumber');
 
 /**
-<<<<<<< HEAD
- * Atomically finalises a sale after a successful payment.
- *
- * Steps:
- *  1. Decrement the gem's stock; flip availability if it reaches 0.
- *  2. Close the originating listing / offer / bid.
- *  3. Reject all other pending offers on the same listing (offer + direct paths).
- *  4. Create the order record linked to the payment.
- *
- * Source determines which of listing/offer/bid is provided.
- */
-async function finalizeSale({ source, sourceId, customerId, payment }) {
-  let gemId;
-  let listingId = null;
-  let offerId = null;
-  let bidId = null;
-
-  if (source === 'direct') {
-    listingId = sourceId;
-    const listing = await Listing.findById(listingId);
-    if (!listing) throw new Error('Listing not found');
-    if (listing.status !== 'active') {
-      const err = new Error('Listing is no longer available');
-      err.status = 409;
-      throw err;
-    }
-    gemId = listing.gem;
-    listing.status = 'sold';
-    await listing.save();
-    await Offer.updateMany(
-      { listing: listingId, status: 'pending' },
-      { $set: { status: 'rejected' } }
-    );
-  } else if (source === 'offer') {
-    offerId = sourceId;
-    const offer = await Offer.findById(offerId);
-    if (!offer) throw new Error('Offer not found');
-    if (offer.status !== 'accepted') {
-      const err = new Error('Offer is not accepted');
-      err.status = 409;
-      throw err;
-    }
-    if (String(offer.customer) !== String(customerId)) {
-      const err = new Error('Offer does not belong to this customer');
-      err.status = 403;
-      throw err;
-    }
-    gemId = offer.gem;
-    listingId = offer.listing;
-    offer.status = 'paid';
-    await offer.save();
-    const listing = await Listing.findById(listingId);
-    if (listing && listing.status === 'active') {
-      listing.status = 'sold';
-      await listing.save();
-    }
-    await Offer.updateMany(
-      { listing: listingId, _id: { $ne: offerId }, status: 'pending' },
-      { $set: { status: 'rejected' } }
-    );
-  } else if (source === 'bid') {
-    bidId = sourceId;
-    const bid = await Bid.findById(bidId);
-    if (!bid) throw new Error('Bid not found');
-    if (bid.status !== 'closed') {
-      const err = new Error('Bid auction has not ended');
-      err.status = 409;
-      throw err;
-    }
-    if (!bid.winner || String(bid.winner) !== String(customerId)) {
-      const err = new Error('Only the winning bidder can complete this sale');
-      err.status = 403;
-      throw err;
-    }
-    gemId = bid.gem;
-  } else {
-    throw new Error(`Unknown sale source: ${source}`);
-  }
-
-  const gem = await Gem.findById(gemId);
-  if (!gem) throw new Error('Gem not found');
-  if (gem.stockQty <= 0) {
-    const err = new Error('Gem is out of stock');
-    err.status = 409;
-    throw err;
-  }
-  gem.stockQty = Math.max(0, gem.stockQty - 1);
-  gem.isAvailable = gem.stockQty > 0;
-  await gem.save();
-=======
  * Atomically finalises a sale once a payment is recorded (Card or COD).
  *
  * Inputs:
@@ -136,8 +66,9 @@ async function finalizeSale({ items, customerId, payment, paymentMethod, shippin
         throw err;
       }
       listingId = listing._id;
-      listing.status = 'sold';
-      await listing.save();
+      // Listing only flips to 'sold' once the underlying gem stock is depleted
+      // (handled below after stock decrement). Pending sibling offers are
+      // rejected immediately because the listing has at least one buyer.
       await Offer.updateMany(
         { listing: listing._id, status: 'pending' },
         { $set: { status: 'rejected' } }
@@ -159,11 +90,7 @@ async function finalizeSale({ items, customerId, payment, paymentMethod, shippin
       listingId = offer.listing;
       offer.status = 'paid';
       await offer.save();
-      const listing = await Listing.findById(listingId);
-      if (listing && listing.status === 'active') {
-        listing.status = 'sold';
-        await listing.save();
-      }
+      // Listing closes via the unified block below (once stock decrement is done).
       await Offer.updateMany(
         { listing: listingId, _id: { $ne: offerId }, status: 'pending' },
         { $set: { status: 'rejected' } }
@@ -186,16 +113,27 @@ async function finalizeSale({ items, customerId, payment, paymentMethod, shippin
       throw new Error(`Unknown sale source: ${source}`);
     }
 
+    const qty = Math.max(1, Number(it.qty) || 1);
     const gem = await Gem.findById(gemId);
     if (!gem) throw new Error('Gem not found');
-    if (gem.stockQty <= 0) {
-      const err = new Error(`Gem "${gem.name}" is out of stock`);
+    if (gem.stockQty < qty) {
+      const err = new Error(`Only ${gem.stockQty} of "${gem.name}" left in stock`);
       err.status = 409;
       throw err;
     }
-    gem.stockQty = Math.max(0, gem.stockQty - 1);
+    gem.stockQty = Math.max(0, gem.stockQty - qty);
     gem.isAvailable = gem.stockQty > 0;
     await gem.save();
+
+    // For direct listings: close the listing once stock is depleted, and for
+    // offer/bid sales (which are 1-of-a-kind transactions), always close.
+    if (listingId && (source !== 'direct' || gem.stockQty === 0)) {
+      const listingDoc = await Listing.findById(listingId);
+      if (listingDoc && listingDoc.status === 'active') {
+        listingDoc.status = 'sold';
+        await listingDoc.save();
+      }
+    }
 
     orderItems.push({
       gem: gem._id,
@@ -203,26 +141,16 @@ async function finalizeSale({ items, customerId, payment, paymentMethod, shippin
       offer: offerId,
       bid: bidId,
       source,
-      qty: it.qty || 1,
+      qty,
       unitPrice: Number(it.unitPrice),
       gemNameSnapshot: gem.name,
       photoSnapshot: gem.photos?.[0] || '',
     });
   }
->>>>>>> 1c80615661ab77c09d44967b404fe9f76d1af461
 
   const order = await Order.create({
     orderNumber: generateOrderNumber(),
     customer: customerId,
-<<<<<<< HEAD
-    gem: gemId,
-    listing: listingId,
-    offer: offerId,
-    bid: bidId,
-    source,
-    amount: payment.amount,
-    payment: payment._id,
-=======
     items: orderItems,
     subtotal,
     shippingFee,
@@ -230,7 +158,6 @@ async function finalizeSale({ items, customerId, payment, paymentMethod, shippin
     paymentMethod,
     payment: payment._id,
     shippingAddress,
->>>>>>> 1c80615661ab77c09d44967b404fe9f76d1af461
     status: 'Confirmed',
   });
 

@@ -1,3 +1,10 @@
+/**
+ * GemDetailScreen — Marketplace (M3) + Reviews (M4)
+ * Hero image carousel (parallax) + price + description + specs.
+ * Customer actions: Add to cart, Make an offer (if openForOffers).
+ * Reviews section: rating distribution, tag-filter chips, sort tabs,
+ * each card shows admin reply + edit/delete (own reviews).
+ */
 import { useEffect, useState, useCallback } from 'react';
 import { Text, View, StyleSheet, Image, ScrollView, Dimensions, Pressable } from 'react-native';
 import Animated, {

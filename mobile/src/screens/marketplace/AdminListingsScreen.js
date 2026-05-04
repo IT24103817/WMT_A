@@ -1,3 +1,8 @@
+/**
+ * AdminListingsScreen — Marketplace (M3)
+ * Admin grid of listings with status badges (active/sold/removed) and
+ * Edit/Delete actions.
+ */
 import { useState, useCallback } from 'react';
 import { Text, FlatList, View, StyleSheet, Image } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';

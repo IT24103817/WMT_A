@@ -1,3 +1,21 @@
+/**
+ * USER MODEL (Auth — Group module)
+ * ================================
+ *
+ * Validations enforced by mongoose:
+ *   - name: required, whitespace trimmed
+ *   - email: required, unique, lowercased, trimmed
+ *   - passwordHash: required (we never store the original password)
+ *   - role: must be 'customer' or 'admin' (defaults to 'customer')
+ *
+ * Notes:
+ *   - `lastAddress` is a subdocument storing the most recent shipping
+ *     address the customer used. The mobile checkout screen prefills the
+ *     form from this on next purchase.
+ *   - The custom `toJSON` strips `passwordHash` from API responses — even
+ *     if a route accidentally sends the whole user, the hash stays private.
+ */
+
 const mongoose = require('mongoose');
 
 const userSchema = new mongoose.Schema(
@@ -6,8 +24,7 @@ const userSchema = new mongoose.Schema(
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     passwordHash: { type: String, required: true },
     role: { type: String, enum: ['customer', 'admin'], default: 'customer' },
-<<<<<<< HEAD
-=======
+    // Saved at end of every checkout so the next one can prefill.
     lastAddress: {
       fullName: String,
       phone: String,
@@ -18,19 +35,14 @@ const userSchema = new mongoose.Schema(
       country: String,
       notes: String,
     },
->>>>>>> 1c80615661ab77c09d44967b404fe9f76d1af461
   },
-  { timestamps: true }
+  { timestamps: true } // mongoose auto-fills createdAt + updatedAt
 );
 
+// Custom serialization: hide passwordHash, expose `id` (not `_id`).
 userSchema.method('toJSON', function () {
-<<<<<<< HEAD
-  const { _id, name, email, role, createdAt } = this;
-  return { id: _id, name, email, role, createdAt };
-=======
   const { _id, name, email, role, createdAt, lastAddress } = this;
   return { id: _id, name, email, role, createdAt, lastAddress: lastAddress || null };
->>>>>>> 1c80615661ab77c09d44967b404fe9f76d1af461
 });
 
 module.exports = mongoose.model('User', userSchema);

@@ -1,3 +1,8 @@
+/**
+ * AdminBidsScreen — Auctions (M5)
+ * Admin grid of every bid with edit/cancel buttons. Closed bids cannot
+ * be cancelled (winner already declared).
+ */
 import { useState, useCallback } from 'react';
 import { Text, FlatList, View, StyleSheet } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';

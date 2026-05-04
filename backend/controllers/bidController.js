@@ -1,13 +1,44 @@
+/**
+ * BID CONTROLLER (Module M5)
+ * ==========================
+ * Module owner: M5 (Bidding / Auctions)
+ *
+ * What this file does:
+ *   Auction-style sales. Admin schedules a bid (now or later) with a start
+ *   price and end time. Customers place increasing bids. The winner pays
+ *   through /api/checkout with source='bid'.
+ *
+ * Why "lazy state"?
+ *   Render's free tier doesn't run scheduled jobs. Instead of a cron, we
+ *   sweep state at the start of every list/get/place call:
+ *     - lazyOpenBids → flips 'scheduled' → 'active' when start time arrived
+ *     - lazyCloseBids → flips 'active' → 'closed' when end time passed
+ *                       (records winner = currentHighest.customer)
+ *   Trade-off: a closed auction stays "active" in the DB until someone
+ *   reads it. That's documented as an academic-scope decision.
+ *
+ * Bid lifecycle:
+ *   scheduled → active → closed → (winner pays via checkout)
+ *   active    → cancelled  (admin pulled it before anyone won)
+ */
+
 const Bid = require('../models/Bid');
 const Gem = require('../models/Gem');
 const lazyCloseBids = require('../utils/lazyCloseBids');
 const lazyOpenBids = require('../utils/lazyOpenBids');
 
+// Run before every read/place — opens scheduled bids whose time arrived
+// and closes active bids whose time expired.
 async function sweep() {
   await lazyOpenBids();
   await lazyCloseBids();
 }
 
+/**
+ * READ-all → GET /api/bids   (public)
+ * Sweeps state first so closed auctions are reflected in the response.
+ * Optional ?status=scheduled|active|closed|cancelled filter.
+ */
 exports.list = async (req, res, next) => {
   try {
     await sweep();
@@ -22,6 +53,10 @@ exports.list = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+/**
+ * READ-one → GET /api/bids/:id   (public)
+ * Same sweep as list. Populates the bid history with bidder names.
+ */
 exports.get = async (req, res, next) => {
   try {
     await sweep();
@@ -35,6 +70,15 @@ exports.get = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+/**
+ * CREATE → POST /api/bids   (admin)
+ * Validations:
+ *   - gemId, startPrice, endTime required
+ *   - endTime must be in the future
+ *   - if scheduledStartAt provided: must be valid date AND before endTime
+ *     (initial status flips to 'scheduled' if scheduled time is in the future)
+ *   - referenced gem must exist with stockQty > 0
+ */
 exports.create = async (req, res, next) => {
   try {
     const { gemId, startPrice, endTime, scheduledStartAt, description } = req.body;
@@ -78,6 +122,13 @@ exports.create = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+/**
+ * UPDATE → PUT /api/bids/:id   (admin)
+ * Edits description, endTime, scheduledStartAt. Refuses to edit closed or
+ * cancelled auctions (would be unfair to the winner / participants).
+ * Convenience flag `goLive: true` flips a scheduled bid to active right
+ * away.
+ */
 exports.update = async (req, res, next) => {
   try {
     const bid = await Bid.findById(req.params.id);
@@ -127,6 +178,14 @@ exports.update = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+/**
+ * UPDATE (place a bid) → POST /api/bids/:id/place   (customer)
+ * Validations (all 409 if violated):
+ *   - bid must be 'active' (not scheduled/closed/cancelled)
+ *   - now must be < endTime
+ *   - amount must be > current highest (or > startPrice if no bids yet)
+ * On success: updates currentHighest and pushes to history[].
+ */
 exports.place = async (req, res, next) => {
   try {
     await sweep();
@@ -155,6 +214,11 @@ exports.place = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+/**
+ * DELETE → DELETE /api/bids/:id   (admin)
+ * Soft-cancel: flips status to 'cancelled'. Closed bids cannot be deleted —
+ * a winner has already been declared.
+ */
 exports.remove = async (req, res, next) => {
   try {
     const bid = await Bid.findById(req.params.id);

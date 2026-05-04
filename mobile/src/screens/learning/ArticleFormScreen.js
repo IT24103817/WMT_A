@@ -1,3 +1,8 @@
+/**
+ * ArticleFormScreen — Learning Hub (M2)
+ * Multipart form with cover image picker. Validations: title/category/body
+ * required; category from the 4-enum.
+ */
 import { useState } from 'react';
 import { Text, View, Image, Pressable, StyleSheet, ScrollView } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';

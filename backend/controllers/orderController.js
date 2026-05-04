@@ -1,3 +1,21 @@
+/**
+ * ORDER CONTROLLER (Module M4)
+ * ============================
+ * Module owner: M4 (Orders + Reviews)
+ *
+ * What this file does:
+ *   Orders are READ-mostly — they're created by the checkout controller
+ *   (see controllers/checkoutController.js + utils/finalizeSale.js). This
+ *   file handles:
+ *     - customer reads (their orders)
+ *     - admin reads (all orders) + status advancement
+ *     - cancellation (customer pre-dispatch, OR admin with refund)
+ *
+ * Order status flow:
+ *   Confirmed → Processing → Out for Delivery → Delivered
+ *   any of the above → Cancelled (customer can only cancel from 'Confirmed')
+ */
+
 const Stripe = require('stripe');
 const Order = require('../models/Order');
 const { ORDER_STATUSES } = require('../models/Order');
@@ -6,40 +24,35 @@ const Gem = require('../models/Gem');
 const Listing = require('../models/Listing');
 const Offer = require('../models/Offer');
 
+// Stripe is optional — if no key, refunds will skip and only COD-style
+// cancellations work. Production always has the key.
 const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY) : null;
 
-<<<<<<< HEAD
-exports.mine = async (req, res, next) => {
-  try {
-    const orders = await Order.find({ customer: req.user._id })
-      .populate('gem')
-      .populate('listing')
-      .sort({ createdAt: -1 });
-=======
+// Hydrate the references so the mobile app can render order cards in one
+// fetch (gem photo, listing title, payment method, etc).
 const populateOrder = (q) =>
   q.populate('items.gem')
    .populate('items.listing')
    .populate('customer', 'name email')
    .populate('payment');
 
+/**
+ * READ-mine → GET /api/orders   (customer)
+ */
 exports.mine = async (req, res, next) => {
   try {
     const orders = await populateOrder(Order.find({ customer: req.user._id }).sort({ createdAt: -1 }));
->>>>>>> 1c80615661ab77c09d44967b404fe9f76d1af461
     res.json(orders);
   } catch (err) { next(err); }
 };
 
+/**
+ * READ-one → GET /api/orders/:id   (customer or admin)
+ * Validation: customers can only read their own orders; admins can read any.
+ */
 exports.get = async (req, res, next) => {
   try {
-<<<<<<< HEAD
-    const order = await Order.findById(req.params.id)
-      .populate('gem')
-      .populate('listing')
-      .populate('customer', 'name email');
-=======
     const order = await populateOrder(Order.findById(req.params.id));
->>>>>>> 1c80615661ab77c09d44967b404fe9f76d1af461
     if (!order) return res.status(404).json({ error: 'Order not found' });
 
     if (
@@ -52,22 +65,24 @@ exports.get = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+/**
+ * READ-all → GET /api/orders/all   (admin)
+ * Optional ?status filter.
+ */
 exports.listAll = async (req, res, next) => {
   try {
     const filter = {};
     if (req.query.status) filter.status = req.query.status;
-<<<<<<< HEAD
-    const orders = await Order.find(filter)
-      .populate('gem')
-      .populate('customer', 'name email')
-      .sort({ createdAt: -1 });
-=======
     const orders = await populateOrder(Order.find(filter).sort({ createdAt: -1 }));
->>>>>>> 1c80615661ab77c09d44967b404fe9f76d1af461
     res.json(orders);
   } catch (err) { next(err); }
 };
 
+/**
+ * UPDATE → PATCH /api/orders/:id   (admin)
+ * Advance the order status. Validation: status must be one of the 5 enum
+ * values defined on the Order model.
+ */
 exports.advance = async (req, res, next) => {
   try {
     const { status } = req.body;
@@ -82,6 +97,11 @@ exports.advance = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+/**
+ * DELETE (soft) → DELETE /api/orders/:id   (customer or admin)
+ * Validation: customers can only cancel from 'Confirmed' (before dispatch).
+ * Admin can cancel anytime, but for refunds they should use cancelWithRefund.
+ */
 exports.cancel = async (req, res, next) => {
   try {
     const order = await Order.findById(req.params.id);
@@ -102,19 +122,18 @@ exports.cancel = async (req, res, next) => {
 };
 
 /**
-<<<<<<< HEAD
- * Admin-only: cancel an order AND refund the customer.
- * Steps:
- *  1. Find the original Payment + Stripe paymentIntent
- *  2. Issue a Stripe refund (test mode shows the refund record on dashboard, no real money moves)
- *  3. Mark payment.status='refunded', save refund reference
- *  4. Restore gem.stockQty + flip availability
- *  5. Reopen the originating listing (if any) so it can sell again
- *  6. Set order.status='Cancelled'
-=======
- * Admin cancel + refund. Walks every item and reverses inventory + listing
- * + offer side-effects, then refunds the customer via Stripe (skipped for COD).
->>>>>>> 1c80615661ab77c09d44967b404fe9f76d1af461
+ * UPDATE (cancel + refund) → POST /api/orders/:id/cancel-refund   (admin)
+ * Walks every item in the order and reverses ALL side effects:
+ *   1. Restore gem.stockQty (and isAvailable)
+ *   2. Reopen the listing if it was 'sold'
+ *   3. Revert paid offers back to 'rejected' (frees the listing)
+ *   4. For card payments: call Stripe refunds.create
+ *   5. Mark Payment as 'refunded' with refundRef + refundedAt
+ *   6. Set order status to 'Cancelled'
+ *
+ * COD orders skip the Stripe call but still mark refunded for audit.
+ * If Stripe refund fails, we abort BEFORE touching inventory — keeps state
+ * consistent.
  */
 exports.cancelWithRefund = async (req, res, next) => {
   try {
@@ -131,12 +150,8 @@ exports.cancelWithRefund = async (req, res, next) => {
     if (!payment) return res.status(404).json({ error: 'Linked payment record missing' });
 
     let refundRef = '';
-<<<<<<< HEAD
-    if (payment.status === 'success' && payment.stripeRef && stripe) {
-=======
     const isCardPayment = payment.stripeRef && !payment.stripeRef.startsWith('cod_');
     if (payment.status === 'success' && isCardPayment && stripe) {
->>>>>>> 1c80615661ab77c09d44967b404fe9f76d1af461
       try {
         const refund = await stripe.refunds.create({ payment_intent: payment.stripeRef });
         refundRef = refund.id;
@@ -151,31 +166,6 @@ exports.cancelWithRefund = async (req, res, next) => {
     payment.refundedAt = new Date();
     await payment.save();
 
-<<<<<<< HEAD
-    // Restore stock
-    const gem = await Gem.findById(order.gem);
-    if (gem) {
-      gem.stockQty = (gem.stockQty || 0) + 1;
-      gem.isAvailable = gem.stockQty > 0;
-      await gem.save();
-    }
-
-    // Reopen listing (only if direct or offer source — bid auctions are permanent)
-    if (order.listing && (order.source === 'direct' || order.source === 'offer')) {
-      const listing = await Listing.findById(order.listing);
-      if (listing && listing.status === 'sold') {
-        listing.status = 'active';
-        await listing.save();
-      }
-    }
-
-    // Reset offer status from 'paid' so the audit trail is clear
-    if (order.offer) {
-      const offer = await Offer.findById(order.offer);
-      if (offer && offer.status === 'paid') {
-        offer.status = 'rejected';
-        await offer.save();
-=======
     // Walk every item and undo
     for (const it of order.items || []) {
       const gem = await Gem.findById(it.gem);
@@ -199,7 +189,6 @@ exports.cancelWithRefund = async (req, res, next) => {
           offer.status = 'rejected';
           await offer.save();
         }
->>>>>>> 1c80615661ab77c09d44967b404fe9f76d1af461
       }
     }
 

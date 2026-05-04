@@ -1,3 +1,9 @@
+/**
+ * EditReviewScreen — Reviews (M4)
+ * Edit your own review. PUTs multipart to /api/reviews/:id. Server
+ * enforces the 30-day edit window. Photo handling: new uploads REPLACE
+ * the array; or send keepPhotos JSON to retain a subset without re-uploading.
+ */
 import { useEffect, useState } from 'react';
 import { Text, View, StyleSheet, Image, Pressable, ScrollView } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
@@ -87,7 +93,13 @@ export default function EditReviewScreen({ route, navigation }) {
     <Screen scroll>
       <Animated.View entering={FadeInDown.duration(420)}>
         <Card style={{ alignItems: 'center', paddingVertical: 24 }}>
-          <Text style={{ fontSize: 48 }}>💎</Text>
+          {review.gem?.photos?.[0] || review.photos?.[0] ? (
+            <Image source={{ uri: review.gem?.photos?.[0] || review.photos?.[0] }} style={styles.heroImage} />
+          ) : (
+            <View style={[styles.heroImage, { alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surfaceMuted }]}>
+              <Text style={{ fontSize: 48 }}>💎</Text>
+            </View>
+          )}
           <Text style={styles.gemName}>{review.gem?.name || 'Gem'}</Text>
           <Text style={styles.askedFor}>Update your review</Text>
 
@@ -148,7 +160,8 @@ export default function EditReviewScreen({ route, navigation }) {
 }
 
 const styles = StyleSheet.create({
-  gemName: { ...type.h1, color: colors.text, fontSize: 22, marginTop: 12 },
+  heroImage: { width: 140, height: 140, borderRadius: radii.lg, backgroundColor: colors.surfaceMuted },
+  gemName: { ...type.h1, color: colors.text, fontSize: 22, marginTop: 16 },
   askedFor: { color: colors.textDim, fontSize: 14, marginTop: 8 },
   ratingLabel: { color: colors.primary, fontSize: 16, fontWeight: '700' },
   label: { color: colors.text, fontSize: 16, fontWeight: '700', marginBottom: 10 },

@@ -1,3 +1,9 @@
+/**
+ * BidFormScreen — Auctions (M5)
+ * Admin create/edit bid. Mode toggle: "Go live now" or "Schedule".
+ * Validations: gem (via GemPicker), startPrice > 0, endTime in future,
+ * scheduledStartAt < endTime when present.
+ */
 import { useState } from 'react';
 import { Text, View, StyleSheet, Pressable, Platform } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';

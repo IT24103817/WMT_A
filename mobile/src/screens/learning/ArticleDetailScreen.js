@@ -1,3 +1,8 @@
+/**
+ * ArticleDetailScreen — Learning Hub (M2)
+ * Full article render with cover image. "View related gems" CTA navigates
+ * to Marketplace prefilled with a search term derived from the article.
+ */
 import { useEffect, useState } from 'react';
 import { Text, View, StyleSheet, Image, Dimensions } from 'react-native';
 import Animated, {

@@ -1,3 +1,27 @@
+/**
+ * UPLOAD MIDDLEWARE (Module M6 — owned by Payment/Cloudinary student)
+ * ====================================================================
+ *
+ * What this file does:
+ *   Wires multer (Express's file-upload parser) to multer-storage-cloudinary
+ *   so that uploaded files stream straight to Cloudinary. The local server
+ *   never holds the file on disk — Render's filesystem is ephemeral anyway.
+ *
+ * Four uploaders are exposed (each used by a different module):
+ *   - articleCoverUpload    M2 Learning Hub — single 'cover' image per article
+ *   - listingMediaUpload    M3 Marketplace — optional 'video' field
+ *   - reviewPhotosUpload    M4 Reviews — up to 3 'photos[]'
+ *   - gemPhotosUpload       M1 Inventory — up to 6 'photos[]'
+ *
+ * Validations:
+ *   - imageFilter: any `image/*` MIME (incl. iOS HEIC)
+ *   - mediaFilter: image/* OR mp4/quicktime/m4v/webm
+ *   - 25 MB per file (LIMIT_FILE_SIZE → 413)
+ *   - photo array caps applied per uploader (3 or 6)
+ *
+ * Cloudinary URLs end up on the model docs (not the bytes).
+ */
+
 const multer = require('multer');
 const { makeStorage } = require('../config/cloudinary');
 
@@ -23,19 +47,12 @@ const articleCoverUpload = multer({
   fileFilter: imageFilter,
 }).single('cover');
 
-<<<<<<< HEAD
-=======
 // NB: photos now live on the Gem (inventory). Listings keep the optional video only.
->>>>>>> 1c80615661ab77c09d44967b404fe9f76d1af461
 const listingMediaUpload = multer({
   storage: makeStorage('listings', 'auto'),
   limits,
   fileFilter: mediaFilter,
 }).fields([
-<<<<<<< HEAD
-  { name: 'photos', maxCount: 6 },
-=======
->>>>>>> 1c80615661ab77c09d44967b404fe9f76d1af461
   { name: 'video', maxCount: 1 },
 ]);
 
@@ -45,15 +62,12 @@ const reviewPhotosUpload = multer({
   fileFilter: imageFilter,
 }).array('photos', 3);
 
-<<<<<<< HEAD
-=======
 const gemPhotosUpload = multer({
   storage: makeStorage('gems', 'image'),
   limits,
   fileFilter: imageFilter,
 }).array('photos', 6);
 
->>>>>>> 1c80615661ab77c09d44967b404fe9f76d1af461
 // Wrap multer middleware so any error becomes a clean 4xx JSON instead of crashing.
 function withUploadErrorHandling(uploader) {
   return (req, res, next) =>
@@ -68,8 +82,5 @@ module.exports = {
   articleCoverUpload: withUploadErrorHandling(articleCoverUpload),
   listingMediaUpload: withUploadErrorHandling(listingMediaUpload),
   reviewPhotosUpload: withUploadErrorHandling(reviewPhotosUpload),
-<<<<<<< HEAD
-=======
   gemPhotosUpload: withUploadErrorHandling(gemPhotosUpload),
->>>>>>> 1c80615661ab77c09d44967b404fe9f76d1af461
 };

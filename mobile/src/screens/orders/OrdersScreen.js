@@ -1,3 +1,8 @@
+/**
+ * OrdersScreen — Orders (M4)
+ * Customer's order history with status badge (Confirmed/Processing/Out
+ * for Delivery/Delivered/Cancelled). Calls orders.mine().
+ */
 import { useState, useCallback } from 'react';
 import { Text, FlatList, StyleSheet, View, Image } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';

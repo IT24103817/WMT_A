@@ -1,3 +1,10 @@
+/**
+ * PaymentScreen — Payment (M6)
+ * Wraps the Stripe SDK <CardField>. Calls confirmPayment() to obtain a
+ * paymentMethodId, then POSTs to /api/checkout with the card token plus
+ * the address/cart from CheckoutScreen. On success: Confetti + replace to
+ * OrderDetail.
+ */
 import { useState } from 'react';
 import { Text, View, StyleSheet, Platform } from 'react-native';
 import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';

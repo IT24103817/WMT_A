@@ -1,3 +1,26 @@
+/**
+ * AuthContext — global login state for the mobile app.
+ * ====================================================
+ * Module owner: Group (Auth)
+ *
+ * What it provides:
+ *   - user / token   (current logged-in user + JWT)
+ *   - loading        (true on cold start while we hydrate from AsyncStorage)
+ *   - login()        wraps POST /api/auth/login + persists token
+ *   - register()     wraps POST /api/auth/register + persists token
+ *   - logout()       clears AsyncStorage + state
+ *
+ * Why AsyncStorage?
+ *   So the user stays logged in across app reloads. On launch we read the
+ *   stored token, call /api/auth/me to refresh the user, and either
+ *   restore the session or wipe it (if the token expired).
+ *
+ * Used by:
+ *   - RootNavigator (decides Auth stack vs CustomerTabs/AdminTabs)
+ *   - every protected screen via useAuth()
+ *   - axios interceptor in api/client.js (which also reads the token)
+ */
+
 import { createContext, useContext, useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { auth as authApi } from '../api';

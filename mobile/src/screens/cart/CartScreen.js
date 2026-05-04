@@ -1,3 +1,9 @@
+/**
+ * CartScreen — Cart (M3)
+ * Shows cart items from CartContext. Each row has a qty stepper (capped
+ * at gem.stockQty), a Remove button, and a "Only N in stock" hint when at
+ * cap. Sticky checkout bar shows subtotal and routes to Checkout.
+ */
 import { View, Text, StyleSheet, FlatList, Image, Pressable } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import Screen from '../../components/Screen';
@@ -9,7 +15,7 @@ import { useCart } from '../../context/CartContext';
 import { colors, formatPrice, type, radii } from '../../theme';
 
 export default function CartScreen({ navigation }) {
-  const { items, remove, subtotal, count } = useCart();
+  const { items, remove, subtotal, count, updateQty } = useCart();
 
   return (
     <Screen padded={false}>
@@ -48,12 +54,34 @@ export default function CartScreen({ navigation }) {
                 <View style={{ flex: 1 }}>
                   <Text style={styles.name}>{item.gemName}</Text>
                   <Text style={styles.meta}>{item.gemMeta}</Text>
-                  <View style={styles.priceRow}>
-                    <Text style={styles.price}>{formatPrice(item.unitPrice)}</Text>
+                  <Text style={styles.price}>{formatPrice(item.unitPrice)}</Text>
+                  <View style={styles.qtyRow}>
+                    <View style={styles.qtyStepper}>
+                      <Pressable
+                        onPress={() => updateQty(item.listingId, (item.qty || 1) - 1)}
+                        disabled={(item.qty || 1) <= 1}
+                        style={[styles.qtyBtn, (item.qty || 1) <= 1 && styles.qtyBtnDisabled]}
+                        hitSlop={6}
+                      >
+                        <Text style={styles.qtyBtnText}>−</Text>
+                      </Pressable>
+                      <Text style={styles.qtyValue}>{item.qty || 1}</Text>
+                      <Pressable
+                        onPress={() => updateQty(item.listingId, (item.qty || 1) + 1)}
+                        disabled={(item.qty || 1) >= (item.stockQty || 1)}
+                        style={[styles.qtyBtn, (item.qty || 1) >= (item.stockQty || 1) && styles.qtyBtnDisabled]}
+                        hitSlop={6}
+                      >
+                        <Text style={styles.qtyBtnText}>+</Text>
+                      </Pressable>
+                    </View>
                     <Pressable onPress={() => remove(item.listingId)} hitSlop={6}>
                       <Text style={styles.removeText}>Remove</Text>
                     </Pressable>
                   </View>
+                  {item.stockQty && (item.qty || 1) >= item.stockQty ? (
+                    <Text style={styles.stockHint}>Only {item.stockQty} in stock</Text>
+                  ) : null}
                 </View>
               </View>
             </Card>
@@ -86,9 +114,23 @@ const styles = StyleSheet.create({
   thumb: { width: 80, height: 80, borderRadius: radii.md, backgroundColor: colors.surfaceMuted },
   name: { color: colors.text, fontSize: 16, fontWeight: '700' },
   meta: { color: colors.textDim, fontSize: 12, marginTop: 4 },
-  priceRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 10 },
-  price: { color: colors.accent, fontSize: 18, fontWeight: '900' },
+  price: { color: colors.accent, fontSize: 18, fontWeight: '900', marginTop: 10 },
+  qtyRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 12 },
+  qtyStepper: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radii.md,
+    paddingHorizontal: 4,
+  },
+  qtyBtn: {
+    width: 32, height: 32, alignItems: 'center', justifyContent: 'center',
+    borderRadius: radii.sm,
+  },
+  qtyBtnDisabled: { opacity: 0.35 },
+  qtyBtnText: { fontSize: 20, color: colors.primary, fontWeight: '900', lineHeight: 22 },
+  qtyValue: { color: colors.text, fontSize: 15, fontWeight: '800', minWidth: 28, textAlign: 'center' },
   removeText: { color: colors.danger, fontSize: 13, fontWeight: '700' },
+  stockHint: { color: colors.warn, fontSize: 11, fontWeight: '600', marginTop: 6 },
   summaryBar: {
     flexDirection: 'row', alignItems: 'center',
     paddingHorizontal: 20, paddingTop: 14, paddingBottom: 20,

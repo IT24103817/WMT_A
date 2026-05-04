@@ -15,10 +15,7 @@ const bidRoutes = require('./routes/bids');
 const orderRoutes = require('./routes/orders');
 const reviewRoutes = require('./routes/reviews');
 const paymentRoutes = require('./routes/payments');
-<<<<<<< HEAD
-=======
 const checkoutRoutes = require('./routes/checkout');
->>>>>>> 1c80615661ab77c09d44967b404fe9f76d1af461
 
 const app = express();
 
@@ -53,10 +50,7 @@ app.use('/api/bids', bidRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/payments', paymentRoutes);
-<<<<<<< HEAD
-=======
 app.use('/api/checkout', checkoutRoutes);
->>>>>>> 1c80615661ab77c09d44967b404fe9f76d1af461
 
 app.use((req, res) => res.status(404).json({ error: 'Not found' }));
 app.use(errorHandler);

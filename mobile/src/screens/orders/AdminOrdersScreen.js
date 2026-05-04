@@ -1,3 +1,9 @@
+/**
+ * AdminOrdersScreen — Orders (M4)
+ * Admin queue of every order. Each card has Cancel (with refund — calls
+ * orders.cancelWithRefund) and Update (→ AdminOrderUpdateScreen).
+ * Cancelled/Delivered orders hide the action buttons.
+ */
 import { useState, useCallback } from 'react';
 import { Text, FlatList, View, StyleSheet, Alert, Platform } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';

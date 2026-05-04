@@ -1,3 +1,10 @@
+/**
+ * CheckoutScreen — Checkout (M3 → M6 handoff)
+ * Collects shipping address (validated client + server) and payment method
+ * (Card or COD). For Card → routes to PaymentScreen which collects the
+ * card. For COD → POSTs directly to /api/checkout. The total is shown but
+ * is server-derived at submit (client can't tamper).
+ */
 import { useEffect, useState, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, Image } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -109,7 +116,7 @@ export default function CheckoutScreen({ route, navigation }) {
           source,
           sourceId,
           shippingAddress: addr,
-          cartItems: source === 'cart' ? cart.items.map((i) => ({ listingId: i.listingId })) : undefined,
+          cartItems: source === 'cart' ? cart.items.map((i) => ({ listingId: i.listingId, qty: i.qty || 1 })) : undefined,
           totalAmount: total,
         },
       });
@@ -124,7 +131,7 @@ export default function CheckoutScreen({ route, navigation }) {
         paymentMethod: 'cod',
         shippingAddress: addr,
       };
-      if (source === 'cart') body.cartItems = cart.items.map((i) => ({ listingId: i.listingId }));
+      if (source === 'cart') body.cartItems = cart.items.map((i) => ({ listingId: i.listingId, qty: i.qty || 1 }));
       else body.sourceId = sourceId;
 
       const { data } = await client.post('/api/checkout', body);
@@ -196,10 +203,12 @@ export default function CheckoutScreen({ route, navigation }) {
                 )}
                 <View style={{ flex: 1 }}>
                   <Text style={styles.summaryName}>{i.gemName}</Text>
-                  <Text style={styles.summaryMeta}>{i.gemMeta}</Text>
+                  <Text style={styles.summaryMeta}>
+                    {i.gemMeta}{i.qty > 1 ? `  ·  Qty ${i.qty}` : ''}
+                  </Text>
                   {i.badge ? <View style={{ marginTop: 4, alignSelf: 'flex-start' }}><Badge label={i.badge} variant="primary" /></View> : null}
                 </View>
-                <Text style={styles.summaryPrice}>{formatPrice(i.unitPrice)}</Text>
+                <Text style={styles.summaryPrice}>{formatPrice(i.unitPrice * (i.qty || 1))}</Text>
               </View>
             ))
           )}

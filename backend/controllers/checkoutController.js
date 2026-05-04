@@ -1,3 +1,32 @@
+/**
+ * CHECKOUT CONTROLLER (Module M6)
+ * ===============================
+ * Module owner: M6 (Payment + Cloudinary + Deployment)
+ *
+ * What this file does:
+ *   The one and only purchase endpoint. Customers reach it from three
+ *   different starting points:
+ *     1. Cart of direct listings  (source: 'cart')
+ *     2. An accepted offer         (source: 'offer')
+ *     3. A won bid                 (source: 'bid')
+ *
+ *   Each source has different validation, but they all flow through the
+ *   same finalizeSale() utility so side-effects are consistent.
+ *
+ * Why is `totalAmount` ALWAYS server-derived?
+ *   Trust boundary. The mobile client could tamper with prices. The server
+ *   reads listing/offer/bid amounts from the database, computes the total
+ *   itself, and uses THAT for the Stripe charge. The client never tells us
+ *   how much to charge.
+ *
+ * Card vs COD:
+ *   - card: requires paymentMethodId from the Stripe SDK; we create a
+ *     PaymentIntent and confirm immediately. On success the Payment doc
+ *     is marked 'success'.
+ *   - cod: no Stripe call. Payment is marked 'pending'. Admin will mark it
+ *     'success' later when the courier returns the cash (manual flow).
+ */
+
 const Stripe = require('stripe');
 const Listing = require('../models/Listing');
 const Offer = require('../models/Offer');
@@ -8,6 +37,9 @@ const finalizeSale = require('../utils/finalizeSale');
 
 const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY) : null;
 
+// Shipping address validation. Returns null if OK, or an error message.
+// Required: fullName, phone, line1, city, postalCode, country.
+// Optional: line2, notes.
 function validateAddress(addr) {
   if (!addr || typeof addr !== 'object') return 'Shipping address is required';
   const required = ['fullName', 'phone', 'line1', 'city', 'postalCode', 'country'];
@@ -78,12 +110,20 @@ async function resolveItems(body, customerId) {
     if (listing.status !== 'active') {
       throw Object.assign(new Error(`Listing "${listing.gem?.name || listing._id}" is no longer available`), { status: 409 });
     }
+    const requested = Math.max(1, Number(ci.qty) || 1);
+    const available = Math.max(0, Number(listing.gem?.stockQty) || 0);
+    if (requested > available) {
+      throw Object.assign(
+        new Error(`Only ${available} of "${listing.gem?.name || 'gem'}" left in stock`),
+        { status: 409 }
+      );
+    }
     out.push({
       source: 'direct',
       sourceId: listing._id,
       gemId: listing.gem._id,
       listingId: listing._id,
-      qty: 1, // gem listings are unique pieces
+      qty: requested,
       unitPrice: listing.price,
     });
   }
@@ -91,10 +131,32 @@ async function resolveItems(body, customerId) {
 }
 
 /**
- * POST /api/checkout
- * Body: { source: 'cart'|'offer'|'bid', cartItems?, sourceId?, paymentMethod, paymentMethodId?, shippingAddress }
- *  - paymentMethod='card' triggers Stripe; 'cod' skips Stripe and creates a 'pending' payment
- *  - paymentMethodId is required only for card
+ * CREATE → POST /api/checkout   (customer)
+ *
+ * Request body:
+ *   { source: 'cart'|'offer'|'bid',
+ *     cartItems?: [{ listingId, qty }],         // when source='cart'
+ *     sourceId?: <offer or bid id>,             // when source='offer'/'bid'
+ *     paymentMethod: 'card' | 'cod',
+ *     paymentMethodId?: <Stripe PM id>,         // required when paymentMethod='card'
+ *     shippingAddress: { fullName, phone, line1, line2?, city, postalCode, country, notes? }
+ *   }
+ *
+ * Validations (in order):
+ *   1. paymentMethod must be 'card' or 'cod'
+ *   2. shippingAddress must have all required fields
+ *   3. resolveItems() validates source-specific rules:
+ *      - cart: each listing 'active', qty ≤ gem.stockQty
+ *      - offer: must belong to user, status='accepted'
+ *      - bid: status='closed', user === winner
+ *   4. card path: Stripe must be configured + paymentMethodId provided
+ *
+ * Side effects (all inside finalizeSale, not here):
+ *   - decrement gem.stockQty by qty
+ *   - close listing if stockQty hits 0 (or always for offer/bid)
+ *   - reject sibling pending offers
+ *   - create Order doc with items[]
+ *   - update user.lastAddress (for next checkout prefill)
  */
 exports.checkout = async (req, res, next) => {
   try {
@@ -143,6 +205,7 @@ exports.checkout = async (req, res, next) => {
       amount: totalAmount,
       stripeRef: stripeRef || `cod_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
       status: paymentStatus,
+      paymentMethod,
       source: firstItem.source,
       sourceId: firstItem.sourceId,
     });

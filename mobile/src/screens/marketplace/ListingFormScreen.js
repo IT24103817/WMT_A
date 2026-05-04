@@ -1,3 +1,8 @@
+/**
+ * ListingFormScreen — Marketplace (M3)
+ * Create/edit listing. Uses GemPicker to select an inventory gem (photos
+ * come from the gem). Optional video upload. openForOffers toggle.
+ */
 import { useEffect, useState } from 'react';
 import { Text, View, ScrollView, Pressable, StyleSheet, Switch, Image } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
