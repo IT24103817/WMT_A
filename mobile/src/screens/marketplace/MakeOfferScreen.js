@@ -26,6 +26,10 @@ export default function MakeOfferScreen({ route, navigation }) {
       toast.warn('Enter an amount greater than 0');
       return;
     }
+    if (!(n > Number(listingPrice) * 0.6)) {
+      toast.warn('Offer must be greater than 60% of the current price.');
+      return;
+    }
     try {
       setLoading(true);
       await offers.create({ listingId, amount: n });
