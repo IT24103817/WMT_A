@@ -4,7 +4,7 @@
  * come from the gem). Optional video upload. openForOffers toggle.
  */
 import { useEffect, useState } from 'react';
-import { Text, View, ScrollView, Pressable, StyleSheet, Switch, Image } from 'react-native';
+import { Alert, Text, View, ScrollView, Pressable, StyleSheet, Switch, Image } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import Screen from '../../components/Screen';
@@ -43,12 +43,25 @@ export default function ListingFormScreen({ navigation, route }) {
   };
 
   const submit = async () => {
+    const trimmedDescription = description.trim();
     const e = {};
+    const validationMessages = [];
+
     if (!editing && !gem) e.gem = 'Pick a gem';
-    if (!(Number(price) > 0)) e.price = 'Required';
-    if (!description.trim()) e.description = 'Required';
+    if (!(Number(price) > 0)) {
+      e.price = 'Price must be greater than 0.';
+      validationMessages.push('Price must be greater than 0.');
+    }
+    if (trimmedDescription.length < 10) {
+      e.description = 'Description must be at least 10 characters long.';
+      validationMessages.push('Description must be at least 10 characters long.');
+    }
+
     setErrors(e);
-    if (Object.keys(e).length) return;
+    if (validationMessages.length) {
+      Alert.alert('Validation error', validationMessages.join('\n'));
+      return;
+    }
 
     if (gem && (!gem.photos || gem.photos.length === 0)) {
       toast.warn(`This gem has no photos yet — add some in Inventory first so customers can see it.`);
