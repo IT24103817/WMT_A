@@ -52,9 +52,13 @@ export default function BiddingScreen({ navigation }) {
           <AnimatedListItem index={index}>
             <Card padded={false} onPress={() => navigation.navigate('BidDetail', { id: item._id })}>
               <View style={{ flexDirection: 'row' }}>
-                <View style={styles.left}>
-                  <Text style={{ fontSize: 36 }}>💎</Text>
-                </View>
+                {item.gem?.photos?.[0] ? (
+                  <Image source={{ uri: item.gem.photos[0] }} style={styles.left} />
+                ) : (
+                  <View style={[styles.left, { alignItems: 'center', justifyContent: 'center' }]}>
+                    <Text style={{ fontSize: 36 }}>💎</Text>
+                  </View>
+                )}
                 <View style={{ flex: 1, padding: 14 }}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <View style={{ flex: 1 }}>
@@ -107,7 +111,7 @@ const styles = StyleSheet.create({
   header: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 12 },
   h1: { ...type.display, color: colors.text },
   sub: { color: colors.textDim, fontSize: 14, marginTop: 4 },
-  left: { width: 96, backgroundColor: colors.surfaceAlt, alignItems: 'center', justifyContent: 'center' },
+  left: { width: 96, height: 96, backgroundColor: colors.surfaceAlt },
   name: { color: colors.text, fontSize: 16, fontWeight: '700' },
   meta: { color: colors.textDim, fontSize: 12, marginTop: 2 },
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: 12 },

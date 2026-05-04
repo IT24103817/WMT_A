@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
-import { View, Text, FlatList, StyleSheet, Image, TextInput, Platform } from 'react-native';
+import { View, Text, FlatList, StyleSheet, Image, TextInput, Platform, Pressable, ScrollView } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import Animated from 'react-native-reanimated';
 import Screen from '../../components/Screen';
@@ -12,10 +12,18 @@ import { marketplace } from '../../api';
 import { listingPhoto } from '../../utils/photo';
 import { colors, formatPrice, type, radii } from '../../theme';
 
+const SORT_OPTIONS = [
+  { key: 'newest', label: 'Newest' },
+  { key: 'priceAsc', label: 'Price ↑' },
+  { key: 'priceDesc', label: 'Price ↓' },
+  { key: 'rating', label: 'Top rated' },
+];
+
 export default function MarketplaceScreen({ navigation, route }) {
   const presetSearch = route.params?.presetSearch;
   const [listings, setListings] = useState([]);
   const [search, setSearch] = useState(presetSearch || '');
+  const [sort, setSort] = useState('newest');
   const [refreshing, setRefreshing] = useState(false);
   const [loaded, setLoaded] = useState(false);
 
@@ -29,12 +37,14 @@ export default function MarketplaceScreen({ navigation, route }) {
   const load = useCallback(async () => {
     try {
       setRefreshing(true);
-      setListings(await marketplace.list(search ? { q: search } : {}));
+      const params = { sort };
+      if (search) params.q = search;
+      setListings(await marketplace.list(params));
       setLoaded(true);
     } finally {
       setRefreshing(false);
     }
-  }, [search]);
+  }, [search, sort]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
@@ -56,6 +66,20 @@ export default function MarketplaceScreen({ navigation, route }) {
             selectionColor={colors.primary}
           />
         </View>
+
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.sortRow}>
+          {SORT_OPTIONS.map((opt) => (
+            <Pressable
+              key={opt.key}
+              onPress={() => setSort(opt.key)}
+              style={[styles.sortChip, sort === opt.key ? styles.sortChipActive : styles.sortChipInactive]}
+            >
+              <Text style={[styles.sortChipText, sort === opt.key && { color: colors.primary }]}>
+                {opt.label}
+              </Text>
+            </Pressable>
+          ))}
+        </ScrollView>
       </View>
 
       <FlatList
@@ -123,6 +147,15 @@ const styles = StyleSheet.create({
   },
   searchIcon: { fontSize: 14, color: colors.textDim, marginRight: 8 },
   search: { flex: 1, color: colors.text, paddingVertical: Platform.OS === 'web' ? 10 : 12, fontSize: 15 },
+  sortRow: { marginTop: 12, marginBottom: -4 },
+  sortChip: {
+    paddingVertical: 7, paddingHorizontal: 14,
+    borderRadius: radii.pill, borderWidth: 1,
+    marginRight: 8,
+  },
+  sortChipInactive: { backgroundColor: colors.bg, borderColor: colors.border },
+  sortChipActive: { backgroundColor: colors.primaryGlow, borderColor: colors.primary },
+  sortChipText: { fontSize: 13, fontWeight: '700', color: colors.textDim },
   thumb: { width: '100%', height: 220, backgroundColor: colors.surfaceMuted },
   thumbPlaceholder: { alignItems: 'center', justifyContent: 'center' },
   name: { color: colors.text, fontSize: 18, fontWeight: '700' },

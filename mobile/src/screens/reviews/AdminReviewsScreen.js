@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { View, Text, FlatList, StyleSheet, Image, Pressable, TextInput } from 'react-native';
+import { View, Text, FlatList, StyleSheet, Image, Pressable, TextInput, ScrollView } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import Screen from '../../components/Screen';
 import Card from '../../components/Card';
@@ -15,6 +15,20 @@ import { reviews as reviewsApi } from '../../api';
 import { useToast } from '../../components/Toast';
 import { colors, type, radii } from '../../theme';
 
+const ADMIN_SORT_OPTIONS = [
+  { key: 'newest', label: 'Newest' },
+  { key: 'oldest', label: 'Oldest' },
+  { key: 'highest', label: 'Highest' },
+  { key: 'lowest', label: 'Lowest' },
+];
+
+const ADMIN_FILTER_OPTIONS = [
+  { key: 'all', label: 'All' },
+  { key: 'photos', label: '📷 With photos' },
+  { key: 'noReply', label: 'Needs reply' },
+  { key: 'replied', label: 'Replied' },
+];
+
 export default function AdminReviewsScreen() {
   const [list, setList] = useState([]);
   const [stats, setStats] = useState(null);
@@ -23,6 +37,8 @@ export default function AdminReviewsScreen() {
   const [replyText, setReplyText] = useState('');
   const [lightboxPhotos, setLightboxPhotos] = useState(null);
   const [lightboxIndex, setLightboxIndex] = useState(0);
+  const [sort, setSort] = useState('newest');
+  const [filter, setFilter] = useState('all');
   const toast = useToast();
 
   const load = useCallback(async () => {
@@ -42,6 +58,19 @@ export default function AdminReviewsScreen() {
   }, []);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
+
+  const sortedList = (() => {
+    let out = [...list];
+    if (filter === 'photos') out = out.filter((r) => r.photos?.length > 0);
+    else if (filter === 'noReply') out = out.filter((r) => !r.adminReply);
+    else if (filter === 'replied') out = out.filter((r) => !!r.adminReply);
+
+    if (sort === 'newest') out.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    else if (sort === 'oldest') out.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+    else if (sort === 'highest') out.sort((a, b) => b.rating - a.rating);
+    else if (sort === 'lowest') out.sort((a, b) => a.rating - b.rating);
+    return out;
+  })();
 
   const remove = async (review) => {
     try {
@@ -136,8 +165,40 @@ export default function AdminReviewsScreen() {
         </View>
       ) : null}
 
+      <View style={styles.toolbar}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          {ADMIN_FILTER_OPTIONS.map((opt) => (
+            <Pressable
+              key={opt.key}
+              onPress={() => setFilter(opt.key)}
+              style={[styles.toolChip, filter === opt.key ? styles.toolChipActive : styles.toolChipInactive]}
+            >
+              <Text style={[styles.toolChipText, filter === opt.key && { color: colors.primary }]}>
+                {opt.label}
+              </Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+      </View>
+      <View style={styles.toolbar}>
+        <Text style={styles.sortLabel}>Sort by</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          {ADMIN_SORT_OPTIONS.map((opt) => (
+            <Pressable
+              key={opt.key}
+              onPress={() => setSort(opt.key)}
+              style={[styles.toolChip, sort === opt.key ? styles.toolChipActive : styles.toolChipInactive]}
+            >
+              <Text style={[styles.toolChipText, sort === opt.key && { color: colors.primary }]}>
+                {opt.label}
+              </Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+      </View>
+
       <FlatList
-        data={list}
+        data={sortedList}
         keyExtractor={(r) => r._id}
         contentContainerStyle={{ padding: 20, paddingTop: 8 }}
         refreshing={refreshing}
@@ -264,6 +325,20 @@ const styles = StyleSheet.create({
   },
   tagText: { color: colors.primary, fontSize: 11, fontWeight: '700' },
   tagCount: { color: colors.textDim, fontSize: 11, fontWeight: '600' },
+
+  toolbar: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    paddingHorizontal: 20, paddingVertical: 6,
+  },
+  sortLabel: { color: colors.textDim, fontSize: 12, fontWeight: '700', marginRight: 6 },
+  toolChip: {
+    paddingVertical: 6, paddingHorizontal: 12,
+    borderRadius: radii.pill, borderWidth: 1,
+    marginRight: 8,
+  },
+  toolChipInactive: { backgroundColor: colors.bg, borderColor: colors.border },
+  toolChipActive: { backgroundColor: colors.primaryGlow, borderColor: colors.primary },
+  toolChipText: { fontSize: 12, fontWeight: '700', color: colors.textDim },
 
   reviewTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 },
   reviewer: { color: colors.text, fontSize: 15, fontWeight: '700' },

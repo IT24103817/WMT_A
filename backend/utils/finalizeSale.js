@@ -46,8 +46,9 @@ async function finalizeSale({ items, customerId, payment, paymentMethod, shippin
         throw err;
       }
       listingId = listing._id;
-      listing.status = 'sold';
-      await listing.save();
+      // Listing only flips to 'sold' once the underlying gem stock is depleted
+      // (handled below after stock decrement). Pending sibling offers are
+      // rejected immediately because the listing has at least one buyer.
       await Offer.updateMany(
         { listing: listing._id, status: 'pending' },
         { $set: { status: 'rejected' } }
@@ -69,11 +70,7 @@ async function finalizeSale({ items, customerId, payment, paymentMethod, shippin
       listingId = offer.listing;
       offer.status = 'paid';
       await offer.save();
-      const listing = await Listing.findById(listingId);
-      if (listing && listing.status === 'active') {
-        listing.status = 'sold';
-        await listing.save();
-      }
+      // Listing closes via the unified block below (once stock decrement is done).
       await Offer.updateMany(
         { listing: listingId, _id: { $ne: offerId }, status: 'pending' },
         { $set: { status: 'rejected' } }
@@ -96,16 +93,27 @@ async function finalizeSale({ items, customerId, payment, paymentMethod, shippin
       throw new Error(`Unknown sale source: ${source}`);
     }
 
+    const qty = Math.max(1, Number(it.qty) || 1);
     const gem = await Gem.findById(gemId);
     if (!gem) throw new Error('Gem not found');
-    if (gem.stockQty <= 0) {
-      const err = new Error(`Gem "${gem.name}" is out of stock`);
+    if (gem.stockQty < qty) {
+      const err = new Error(`Only ${gem.stockQty} of "${gem.name}" left in stock`);
       err.status = 409;
       throw err;
     }
-    gem.stockQty = Math.max(0, gem.stockQty - 1);
+    gem.stockQty = Math.max(0, gem.stockQty - qty);
     gem.isAvailable = gem.stockQty > 0;
     await gem.save();
+
+    // For direct listings: close the listing once stock is depleted, and for
+    // offer/bid sales (which are 1-of-a-kind transactions), always close.
+    if (listingId && (source !== 'direct' || gem.stockQty === 0)) {
+      const listingDoc = await Listing.findById(listingId);
+      if (listingDoc && listingDoc.status === 'active') {
+        listingDoc.status = 'sold';
+        await listingDoc.save();
+      }
+    }
 
     orderItems.push({
       gem: gem._id,
@@ -113,7 +121,7 @@ async function finalizeSale({ items, customerId, payment, paymentMethod, shippin
       offer: offerId,
       bid: bidId,
       source,
-      qty: it.qty || 1,
+      qty,
       unitPrice: Number(it.unitPrice),
       gemNameSnapshot: gem.name,
       photoSnapshot: gem.photos?.[0] || '',

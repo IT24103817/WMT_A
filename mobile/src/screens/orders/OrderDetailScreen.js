@@ -104,7 +104,13 @@ export default function OrderDetailScreen({ route, navigation }) {
                         variant="secondary"
                         size="sm"
                         style={{ marginTop: 8 }}
-                        onPress={() => navigation.navigate('Review', { orderId: order._id, gemName: it.gemNameSnapshot || it.gem?.name })}
+                        onPress={() => navigation.navigate('Review', {
+                          orderId: order._id,
+                          gemId: it.gem?._id,
+                          gemName: it.gemNameSnapshot || it.gem?.name,
+                          gemPhoto: it.photoSnapshot || it.gem?.photos?.[0] || null,
+                          gemMeta: [it.gem?.type, it.gem?.colour, it.gem?.carats ? `${it.gem.carats}ct` : null].filter(Boolean).join(' · '),
+                        })}
                       />
                     )
                   ) : null}

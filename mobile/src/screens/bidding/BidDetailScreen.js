@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Text, View, StyleSheet } from 'react-native';
+import { Text, View, StyleSheet, Image, ScrollView, Dimensions, Pressable } from 'react-native';
+import PhotoLightbox from '../../components/PhotoLightbox';
 import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 import { useFocusEffect } from '@react-navigation/native';
 import Screen from '../../components/Screen';
@@ -22,6 +23,7 @@ export default function BidDetailScreen({ route, navigation }) {
   const [bid, setBid] = useState(null);
   const [amount, setAmount] = useState('');
   const [loading, setLoading] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState(-1);
 
   const load = useCallback(async () => {
     try {
@@ -61,18 +63,28 @@ export default function BidDetailScreen({ route, navigation }) {
   return (
     <Screen scroll>
       <Animated.View entering={FadeInDown.duration(420)}>
-        <View style={styles.gemHero}>
-          <Text style={{ fontSize: 56 }}>💎</Text>
-          <Text style={styles.name}>{bid.gem?.name}</Text>
-          <Text style={styles.meta}>
-            {bid.gem?.type} · {bid.gem?.colour} · {bid.gem?.carats}ct
+        {bid.gem?.photos?.length ? (
+          <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false} style={styles.galleryWrap}>
+            {bid.gem.photos.map((p, i) => (
+              <Pressable key={i} onPress={() => setLightboxIndex(i)}>
+                <Image source={{ uri: p }} style={styles.galleryImage} />
+              </Pressable>
+            ))}
+          </ScrollView>
+        ) : (
+          <View style={styles.gemHero}>
+            <Text style={{ fontSize: 56 }}>💎</Text>
+          </View>
+        )}
+        <Text style={styles.name}>{bid.gem?.name}</Text>
+        <Text style={styles.meta}>
+          {bid.gem?.type} · {bid.gem?.colour} · {bid.gem?.carats}ct
+        </Text>
+        {bid.description ? (
+          <Text style={{ color: colors.text, fontSize: 14, lineHeight: 20, marginTop: 12 }}>
+            {bid.description}
           </Text>
-          {bid.description ? (
-            <Text style={{ color: colors.text, fontSize: 14, lineHeight: 20, marginTop: 12, textAlign: 'center', paddingHorizontal: 16 }}>
-              {bid.description}
-            </Text>
-          ) : null}
-        </View>
+        ) : null}
       </Animated.View>
 
       {bid.status === 'scheduled' && bid.scheduledStartAt ? (
@@ -166,18 +178,29 @@ export default function BidDetailScreen({ route, navigation }) {
           ))}
         </>
       ) : null}
+
+      <PhotoLightbox
+        visible={lightboxIndex >= 0}
+        photos={bid.gem?.photos || []}
+        initialIndex={Math.max(0, lightboxIndex)}
+        onClose={() => setLightboxIndex(-1)}
+      />
     </Screen>
   );
 }
 
+const SCREEN_W = Dimensions.get('window').width;
+
 const styles = StyleSheet.create({
   gemHero: {
     alignItems: 'center',
-    paddingVertical: 24,
+    paddingVertical: 48,
     backgroundColor: colors.surfaceAlt,
     borderRadius: radii.xl,
     marginBottom: 16,
   },
+  galleryWrap: { borderRadius: radii.xl, overflow: 'hidden', marginBottom: 16 },
+  galleryImage: { width: SCREEN_W - 40, height: 280, backgroundColor: colors.surfaceMuted },
   name: { ...type.h1, color: colors.text, marginTop: 8 },
   meta: { color: colors.textDim, fontSize: 13, marginTop: 4 },
   headlineCard: { alignItems: 'center', paddingVertical: 20 },

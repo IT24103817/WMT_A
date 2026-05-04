@@ -109,7 +109,7 @@ export default function CheckoutScreen({ route, navigation }) {
           source,
           sourceId,
           shippingAddress: addr,
-          cartItems: source === 'cart' ? cart.items.map((i) => ({ listingId: i.listingId })) : undefined,
+          cartItems: source === 'cart' ? cart.items.map((i) => ({ listingId: i.listingId, qty: i.qty || 1 })) : undefined,
           totalAmount: total,
         },
       });
@@ -124,7 +124,7 @@ export default function CheckoutScreen({ route, navigation }) {
         paymentMethod: 'cod',
         shippingAddress: addr,
       };
-      if (source === 'cart') body.cartItems = cart.items.map((i) => ({ listingId: i.listingId }));
+      if (source === 'cart') body.cartItems = cart.items.map((i) => ({ listingId: i.listingId, qty: i.qty || 1 }));
       else body.sourceId = sourceId;
 
       const { data } = await client.post('/api/checkout', body);
@@ -196,10 +196,12 @@ export default function CheckoutScreen({ route, navigation }) {
                 )}
                 <View style={{ flex: 1 }}>
                   <Text style={styles.summaryName}>{i.gemName}</Text>
-                  <Text style={styles.summaryMeta}>{i.gemMeta}</Text>
+                  <Text style={styles.summaryMeta}>
+                    {i.gemMeta}{i.qty > 1 ? `  ·  Qty ${i.qty}` : ''}
+                  </Text>
                   {i.badge ? <View style={{ marginTop: 4, alignSelf: 'flex-start' }}><Badge label={i.badge} variant="primary" /></View> : null}
                 </View>
-                <Text style={styles.summaryPrice}>{formatPrice(i.unitPrice)}</Text>
+                <Text style={styles.summaryPrice}>{formatPrice(i.unitPrice * (i.qty || 1))}</Text>
               </View>
             ))
           )}

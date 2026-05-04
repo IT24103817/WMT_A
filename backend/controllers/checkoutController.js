@@ -78,12 +78,20 @@ async function resolveItems(body, customerId) {
     if (listing.status !== 'active') {
       throw Object.assign(new Error(`Listing "${listing.gem?.name || listing._id}" is no longer available`), { status: 409 });
     }
+    const requested = Math.max(1, Number(ci.qty) || 1);
+    const available = Math.max(0, Number(listing.gem?.stockQty) || 0);
+    if (requested > available) {
+      throw Object.assign(
+        new Error(`Only ${available} of "${listing.gem?.name || 'gem'}" left in stock`),
+        { status: 409 }
+      );
+    }
     out.push({
       source: 'direct',
       sourceId: listing._id,
       gemId: listing.gem._id,
       listingId: listing._id,
-      qty: 1, // gem listings are unique pieces
+      qty: requested,
       unitPrice: listing.price,
     });
   }
@@ -143,6 +151,7 @@ exports.checkout = async (req, res, next) => {
       amount: totalAmount,
       stripeRef: stripeRef || `cod_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
       status: paymentStatus,
+      paymentMethod,
       source: firstItem.source,
       sourceId: firstItem.sourceId,
     });

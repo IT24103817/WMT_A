@@ -1,9 +1,17 @@
 const Listing = require('../models/Listing');
 const Gem = require('../models/Gem');
+const Review = require('../models/Review');
+
+const SORT_MAP = {
+  newest: { createdAt: -1 },
+  oldest: { createdAt: 1 },
+  priceAsc: { price: 1 },
+  priceDesc: { price: -1 },
+};
 
 exports.list = async (req, res, next) => {
   try {
-    const { q, category, type, min, max } = req.query;
+    const { q, category, type, min, max, sort = 'newest' } = req.query;
     const listingFilter = { status: 'active' };
     if (min || max) {
       listingFilter.price = {};
@@ -11,7 +19,8 @@ exports.list = async (req, res, next) => {
       if (max) listingFilter.price.$lte = Number(max);
     }
 
-    let listings = await Listing.find(listingFilter).populate('gem').sort({ createdAt: -1 });
+    const sortSpec = SORT_MAP[sort] || SORT_MAP.newest;
+    let listings = await Listing.find(listingFilter).populate('gem').sort(sortSpec);
 
     if (q) {
       const re = new RegExp(q, 'i');
@@ -20,6 +29,20 @@ exports.list = async (req, res, next) => {
     if (category || type) {
       const target = (category || type || '').toLowerCase();
       listings = listings.filter((l) => (l.gem?.type || '').toLowerCase() === target);
+    }
+
+    // For rating-based sort, do a single aggregate over all gem ids and re-rank.
+    if (sort === 'rating') {
+      const gemIds = listings.map((l) => l.gem?._id).filter(Boolean);
+      const ratings = await Review.aggregate([
+        { $match: { gem: { $in: gemIds } } },
+        { $group: { _id: '$gem', avg: { $avg: '$rating' }, count: { $sum: 1 } } },
+      ]);
+      const ratingMap = new Map(ratings.map((r) => [String(r._id), r]));
+      listings = listings
+        .map((l) => ({ l, r: ratingMap.get(String(l.gem?._id)) }))
+        .sort((a, b) => (b.r?.avg || 0) - (a.r?.avg || 0))
+        .map(({ l }) => l);
     }
 
     res.json(listings);

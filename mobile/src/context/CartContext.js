@@ -40,6 +40,7 @@ export function CartProvider({ children }) {
         photo: listing.gem?.photos?.[0] || listing.photos?.[0] || null,
         unitPrice: listing.price,
         qty: 1,
+        stockQty: Math.max(1, Number(listing.gem?.stockQty) || 1),
       }];
     });
   }, []);
@@ -49,9 +50,11 @@ export function CartProvider({ children }) {
   }, []);
 
   const updateQty = useCallback((listingId, qty) => {
-    setItems((prev) => prev.map((i) =>
-      i.listingId === listingId ? { ...i, qty: Math.max(1, qty) } : i
-    ));
+    setItems((prev) => prev.map((i) => {
+      if (i.listingId !== listingId) return i;
+      const cap = Math.max(1, Number(i.stockQty) || 1);
+      return { ...i, qty: Math.max(1, Math.min(cap, qty)) };
+    }));
   }, []);
 
   const clear = useCallback(() => setItems([]), []);
