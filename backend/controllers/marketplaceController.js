@@ -44,22 +44,33 @@ exports.create = async (req, res, next) => {
     if (!gem) return res.status(404).json({ error: 'Gem not found' });
     if (gem.stockQty <= 0) return res.status(409).json({ error: 'Gem is out of stock' });
 
+<<<<<<< HEAD
     const photos = (req.files?.photos || []).map((f) => f.path);
+=======
+>>>>>>> 1c80615661ab77c09d44967b404fe9f76d1af461
     const videoUrl = req.files?.video?.[0]?.path || '';
 
     console.log('[marketplace.create]', {
       gemName: gem.name,
+<<<<<<< HEAD
       photoCount: photos.length,
       videoAttached: !!videoUrl,
       receivedFiles: Object.keys(req.files || {}),
       bodyKeys: Object.keys(req.body || {}),
+=======
+      gemPhotos: gem.photos?.length || 0,
+      videoAttached: !!videoUrl,
+>>>>>>> 1c80615661ab77c09d44967b404fe9f76d1af461
     });
 
     const listing = await Listing.create({
       gem: gem._id,
       price: Number(price),
       description,
+<<<<<<< HEAD
       photos,
+=======
+>>>>>>> 1c80615661ab77c09d44967b404fe9f76d1af461
       videoUrl,
       openForOffers: openForOffers === 'true' || openForOffers === true,
     });
@@ -81,9 +92,12 @@ exports.update = async (req, res, next) => {
           f === 'openForOffers' ? req.body[f] === 'true' || req.body[f] === true : req.body[f];
       }
     }
+<<<<<<< HEAD
     if (req.files?.photos?.length) {
       listing.photos = [...listing.photos, ...req.files.photos.map((f) => f.path)];
     }
+=======
+>>>>>>> 1c80615661ab77c09d44967b404fe9f76d1af461
     if (req.files?.video?.[0]) listing.videoUrl = req.files.video[0].path;
 
     await listing.save();

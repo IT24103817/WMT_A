@@ -48,6 +48,10 @@ export const bids = {
   list: () => client.get('/api/bids').then((r) => r.data),
   get: (id) => client.get(`/api/bids/${id}`).then((r) => r.data),
   create: (data) => client.post('/api/bids', data).then((r) => r.data),
+<<<<<<< HEAD
+=======
+  update: (id, data) => client.put(`/api/bids/${id}`, data).then((r) => r.data),
+>>>>>>> 1c80615661ab77c09d44967b404fe9f76d1af461
   place: (id, amount) => client.post(`/api/bids/${id}/place`, { amount }).then((r) => r.data),
   remove: (id) => client.delete(`/api/bids/${id}`).then((r) => r.data),
 };

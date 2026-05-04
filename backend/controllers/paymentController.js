@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 const Stripe = require('stripe');
 const Payment = require('../models/Payment');
 const Listing = require('../models/Listing');
@@ -97,6 +98,14 @@ exports.charge = async (req, res, next) => {
     res.status(201).json({ payment, order });
   } catch (err) { next(err); }
 };
+=======
+const Payment = require('../models/Payment');
+
+/**
+ * Note: the customer-facing charge endpoint moved to POST /api/checkout.
+ * This file keeps only the admin-facing read endpoints.
+ */
+>>>>>>> 1c80615661ab77c09d44967b404fe9f76d1af461
 
 exports.list = async (req, res, next) => {
   try {

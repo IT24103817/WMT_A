@@ -23,12 +23,19 @@ const articleCoverUpload = multer({
   fileFilter: imageFilter,
 }).single('cover');
 
+<<<<<<< HEAD
+=======
+// NB: photos now live on the Gem (inventory). Listings keep the optional video only.
+>>>>>>> 1c80615661ab77c09d44967b404fe9f76d1af461
 const listingMediaUpload = multer({
   storage: makeStorage('listings', 'auto'),
   limits,
   fileFilter: mediaFilter,
 }).fields([
+<<<<<<< HEAD
   { name: 'photos', maxCount: 6 },
+=======
+>>>>>>> 1c80615661ab77c09d44967b404fe9f76d1af461
   { name: 'video', maxCount: 1 },
 ]);
 
@@ -38,6 +45,15 @@ const reviewPhotosUpload = multer({
   fileFilter: imageFilter,
 }).array('photos', 3);
 
+<<<<<<< HEAD
+=======
+const gemPhotosUpload = multer({
+  storage: makeStorage('gems', 'image'),
+  limits,
+  fileFilter: imageFilter,
+}).array('photos', 6);
+
+>>>>>>> 1c80615661ab77c09d44967b404fe9f76d1af461
 // Wrap multer middleware so any error becomes a clean 4xx JSON instead of crashing.
 function withUploadErrorHandling(uploader) {
   return (req, res, next) =>
@@ -52,4 +68,8 @@ module.exports = {
   articleCoverUpload: withUploadErrorHandling(articleCoverUpload),
   listingMediaUpload: withUploadErrorHandling(listingMediaUpload),
   reviewPhotosUpload: withUploadErrorHandling(reviewPhotosUpload),
+<<<<<<< HEAD
+=======
+  gemPhotosUpload: withUploadErrorHandling(gemPhotosUpload),
+>>>>>>> 1c80615661ab77c09d44967b404fe9f76d1af461
 };

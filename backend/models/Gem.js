@@ -8,6 +8,10 @@ const gemSchema = new mongoose.Schema(
     carats: { type: Number, required: true, min: 0 },
     stockQty: { type: Number, required: true, min: 0, default: 1 },
     isAvailable: { type: Boolean, default: true },
+<<<<<<< HEAD
+=======
+    photos: { type: [String], default: [] },
+>>>>>>> 1c80615661ab77c09d44967b404fe9f76d1af461
   },
   { timestamps: true }
 );

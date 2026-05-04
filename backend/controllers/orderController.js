@@ -8,22 +8,38 @@ const Offer = require('../models/Offer');
 
 const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY) : null;
 
+<<<<<<< HEAD
 exports.mine = async (req, res, next) => {
   try {
     const orders = await Order.find({ customer: req.user._id })
       .populate('gem')
       .populate('listing')
       .sort({ createdAt: -1 });
+=======
+const populateOrder = (q) =>
+  q.populate('items.gem')
+   .populate('items.listing')
+   .populate('customer', 'name email')
+   .populate('payment');
+
+exports.mine = async (req, res, next) => {
+  try {
+    const orders = await populateOrder(Order.find({ customer: req.user._id }).sort({ createdAt: -1 }));
+>>>>>>> 1c80615661ab77c09d44967b404fe9f76d1af461
     res.json(orders);
   } catch (err) { next(err); }
 };
 
 exports.get = async (req, res, next) => {
   try {
+<<<<<<< HEAD
     const order = await Order.findById(req.params.id)
       .populate('gem')
       .populate('listing')
       .populate('customer', 'name email');
+=======
+    const order = await populateOrder(Order.findById(req.params.id));
+>>>>>>> 1c80615661ab77c09d44967b404fe9f76d1af461
     if (!order) return res.status(404).json({ error: 'Order not found' });
 
     if (
@@ -40,10 +56,14 @@ exports.listAll = async (req, res, next) => {
   try {
     const filter = {};
     if (req.query.status) filter.status = req.query.status;
+<<<<<<< HEAD
     const orders = await Order.find(filter)
       .populate('gem')
       .populate('customer', 'name email')
       .sort({ createdAt: -1 });
+=======
+    const orders = await populateOrder(Order.find(filter).sort({ createdAt: -1 }));
+>>>>>>> 1c80615661ab77c09d44967b404fe9f76d1af461
     res.json(orders);
   } catch (err) { next(err); }
 };
@@ -82,6 +102,7 @@ exports.cancel = async (req, res, next) => {
 };
 
 /**
+<<<<<<< HEAD
  * Admin-only: cancel an order AND refund the customer.
  * Steps:
  *  1. Find the original Payment + Stripe paymentIntent
@@ -90,6 +111,10 @@ exports.cancel = async (req, res, next) => {
  *  4. Restore gem.stockQty + flip availability
  *  5. Reopen the originating listing (if any) so it can sell again
  *  6. Set order.status='Cancelled'
+=======
+ * Admin cancel + refund. Walks every item and reverses inventory + listing
+ * + offer side-effects, then refunds the customer via Stripe (skipped for COD).
+>>>>>>> 1c80615661ab77c09d44967b404fe9f76d1af461
  */
 exports.cancelWithRefund = async (req, res, next) => {
   try {
@@ -106,7 +131,12 @@ exports.cancelWithRefund = async (req, res, next) => {
     if (!payment) return res.status(404).json({ error: 'Linked payment record missing' });
 
     let refundRef = '';
+<<<<<<< HEAD
     if (payment.status === 'success' && payment.stripeRef && stripe) {
+=======
+    const isCardPayment = payment.stripeRef && !payment.stripeRef.startsWith('cod_');
+    if (payment.status === 'success' && isCardPayment && stripe) {
+>>>>>>> 1c80615661ab77c09d44967b404fe9f76d1af461
       try {
         const refund = await stripe.refunds.create({ payment_intent: payment.stripeRef });
         refundRef = refund.id;
@@ -121,6 +151,7 @@ exports.cancelWithRefund = async (req, res, next) => {
     payment.refundedAt = new Date();
     await payment.save();
 
+<<<<<<< HEAD
     // Restore stock
     const gem = await Gem.findById(order.gem);
     if (gem) {
@@ -144,6 +175,31 @@ exports.cancelWithRefund = async (req, res, next) => {
       if (offer && offer.status === 'paid') {
         offer.status = 'rejected';
         await offer.save();
+=======
+    // Walk every item and undo
+    for (const it of order.items || []) {
+      const gem = await Gem.findById(it.gem);
+      if (gem) {
+        gem.stockQty = (gem.stockQty || 0) + (it.qty || 1);
+        gem.isAvailable = gem.stockQty > 0;
+        await gem.save();
+      }
+
+      if (it.listing && (it.source === 'direct' || it.source === 'offer')) {
+        const listing = await Listing.findById(it.listing);
+        if (listing && listing.status === 'sold') {
+          listing.status = 'active';
+          await listing.save();
+        }
+      }
+
+      if (it.offer) {
+        const offer = await Offer.findById(it.offer);
+        if (offer && offer.status === 'paid') {
+          offer.status = 'rejected';
+          await offer.save();
+        }
+>>>>>>> 1c80615661ab77c09d44967b404fe9f76d1af461
       }
     }
 
