@@ -1,3 +1,8 @@
+/**
+ * AdminOrderUpdateScreen — Orders (M4)
+ * Pick a new status from the 5-enum and confirm. PATCHes /api/orders/:id.
+ * The current status row is dimmed; you can't pick the same one.
+ */
 import { useState, useEffect } from 'react';
 import { Text, View, StyleSheet, Pressable } from 'react-native';
 import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';

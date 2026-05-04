@@ -1,3 +1,28 @@
+/**
+ * CartContext — local shopping cart for the mobile app.
+ * =====================================================
+ * Module owner: M3 (Marketplace + Offers)
+ *
+ * What it provides (via useCart()):
+ *   - items[]              line items in the cart
+ *   - count                items.length
+ *   - subtotal             sum of unitPrice × qty
+ *   - add(listing)         drop a listing into the cart (no-op if already in)
+ *   - remove(listingId)    pull a listing out
+ *   - updateQty(id, qty)   change qty (clamped to [1, item.stockQty])
+ *   - has(listingId)       returns true if listing is in cart
+ *   - clear()              empty the cart (called after successful checkout)
+ *
+ * Why local storage?
+ *   The cart is per-device, not per-user — no need to round-trip the server.
+ *   AsyncStorage persists it across app launches so users don't lose items
+ *   if they close the app mid-shop.
+ *
+ * Validation:
+ *   updateQty caps qty at item.stockQty (set when the listing was added).
+ *   The server re-validates on /api/checkout in case stock changed.
+ */
+
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 

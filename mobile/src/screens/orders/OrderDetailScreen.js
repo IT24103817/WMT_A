@@ -1,3 +1,10 @@
+/**
+ * OrderDetailScreen — Orders (M4)
+ * Full order view with the 4-step StatusTracker, items list, shipping
+ * address, payment summary. "Leave a review" button appears next to each
+ * item when status === 'Delivered'. Customer can cancel only when status
+ * is 'Confirmed'.
+ */
 import { useState, useCallback } from 'react';
 import { Text, View, StyleSheet, Image } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';

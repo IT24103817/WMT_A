@@ -1,3 +1,23 @@
+/**
+ * MARKETPLACE CONTROLLER (Module M3)
+ * ==================================
+ * Module owner: M3 (Marketplace + Offers)
+ *
+ * What this file does:
+ *   Listings — pieces for sale at a fixed price (or open for offers).
+ *   A listing references a Gem document; photos live on the Gem so we
+ *   never duplicate them.
+ *
+ * Listing lifecycle:
+ *   active → sold (paid through cart or accepted offer or won bid)
+ *   active → removed (admin pulled it)
+ *
+ * Sort modes:
+ *   newest, oldest, priceAsc, priceDesc, rating
+ *   The first 4 are simple Mongo sort; 'rating' uses an aggregation over
+ *   reviews and re-ranks in JS.
+ */
+
 const Listing = require('../models/Listing');
 const Gem = require('../models/Gem');
 const Review = require('../models/Review');
@@ -9,6 +29,11 @@ const SORT_MAP = {
   priceDesc: { price: -1 },
 };
 
+/**
+ * READ-all → GET /api/marketplace   (public)
+ * Query params: q (search text), category/type, min/max (price range), sort.
+ * Only returns 'active' listings.
+ */
 exports.list = async (req, res, next) => {
   try {
     const { q, category, type, min, max, sort = 'newest' } = req.query;
@@ -49,6 +74,9 @@ exports.list = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+/**
+ * READ-one → GET /api/marketplace/:id   (public)
+ */
 exports.get = async (req, res, next) => {
   try {
     const listing = await Listing.findById(req.params.id).populate('gem');
@@ -57,6 +85,13 @@ exports.get = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+/**
+ * CREATE → POST /api/marketplace   (admin, multipart with optional video)
+ * Validations:
+ *   - gemId, price, description required
+ *   - referenced gem must exist with stockQty > 0
+ *   - photos are read from the gem (no duplicate storage)
+ */
 exports.create = async (req, res, next) => {
   try {
     const { gemId, price, description, openForOffers } = req.body;
@@ -88,6 +123,10 @@ exports.create = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+/**
+ * UPDATE → PUT /api/marketplace/:id   (admin)
+ * Edits price/description/openForOffers/status. Optional new video upload.
+ */
 exports.update = async (req, res, next) => {
   try {
     const listing = await Listing.findById(req.params.id);
@@ -108,6 +147,11 @@ exports.update = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+/**
+ * DELETE (soft) → DELETE /api/marketplace/:id   (admin)
+ * Soft delete: status='removed'. Existing orders that reference this listing
+ * still display correctly (snapshot fields on Order.items).
+ */
 exports.remove = async (req, res, next) => {
   try {
     const listing = await Listing.findById(req.params.id);

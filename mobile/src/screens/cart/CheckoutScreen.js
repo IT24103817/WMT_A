@@ -1,3 +1,10 @@
+/**
+ * CheckoutScreen — Checkout (M3 → M6 handoff)
+ * Collects shipping address (validated client + server) and payment method
+ * (Card or COD). For Card → routes to PaymentScreen which collects the
+ * card. For COD → POSTs directly to /api/checkout. The total is shown but
+ * is server-derived at submit (client can't tamper).
+ */
 import { useEffect, useState, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, Image } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';

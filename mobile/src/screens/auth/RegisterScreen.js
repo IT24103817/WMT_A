@@ -1,3 +1,9 @@
+/**
+ * RegisterScreen — Auth (Group module)
+ * Creates a new customer account. Calls AuthContext.register() →
+ * POST /api/auth/register. Validations: name/email/password required,
+ * password ≥ 6 chars (server also checks).
+ */
 import { useState } from 'react';
 import { Text, StyleSheet, KeyboardAvoidingView, Platform, Pressable } from 'react-native';
 import Animated, { FadeInUp, FadeInDown } from 'react-native-reanimated';

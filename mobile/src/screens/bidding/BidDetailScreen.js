@@ -1,3 +1,10 @@
+/**
+ * BidDetailScreen — Auctions (M5)
+ * Full bid view: image gallery + lightbox, current highest, countdown,
+ * place-bid form (active only), winner pay CTA (closed + winner === me),
+ * bid history. Validations (client + server): amount > current highest,
+ * now < endTime.
+ */
 import { useEffect, useState, useCallback } from 'react';
 import { Text, View, StyleSheet, Image, ScrollView, Dimensions, Pressable } from 'react-native';
 import PhotoLightbox from '../../components/PhotoLightbox';

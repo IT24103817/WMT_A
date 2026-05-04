@@ -1,3 +1,8 @@
+/**
+ * MyReviewsScreen — Reviews (M4)
+ * Customer-owned list. Calls reviews.mine(). Each row links to
+ * EditReviewScreen (within 30-day window) or Delete.
+ */
 import { useState, useCallback } from 'react';
 import { Text, FlatList, View, StyleSheet, Alert, Platform, Pressable, Image } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';

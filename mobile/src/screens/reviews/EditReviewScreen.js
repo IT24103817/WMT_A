@@ -1,3 +1,9 @@
+/**
+ * EditReviewScreen — Reviews (M4)
+ * Edit your own review. PUTs multipart to /api/reviews/:id. Server
+ * enforces the 30-day edit window. Photo handling: new uploads REPLACE
+ * the array; or send keepPhotos JSON to retain a subset without re-uploading.
+ */
 import { useEffect, useState } from 'react';
 import { Text, View, StyleSheet, Image, Pressable, ScrollView } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';

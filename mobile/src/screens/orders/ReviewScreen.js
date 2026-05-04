@@ -1,3 +1,10 @@
+/**
+ * ReviewScreen — Reviews (M4)
+ * Customer posts a new review for a delivered order. Validations (client):
+ * rating 1-5 (integer), comment 10-500 chars OR empty, no URLs, no
+ * all-caps shouting, max 3 photos, max 3 tags from 8 predefined.
+ * Server (reviewController.create) re-validates the same rules.
+ */
 import { useEffect, useState } from 'react';
 import { Text, View, StyleSheet, Image, Pressable, ScrollView } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';

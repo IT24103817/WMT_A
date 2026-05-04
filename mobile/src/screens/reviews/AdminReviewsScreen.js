@@ -1,3 +1,10 @@
+/**
+ * AdminReviewsScreen — Reviews (M4)
+ * Admin moderation hub. Aggregate stats card (avg + 1-5★ distribution +
+ * top tag mentions), filter chips (All / With photos / Needs reply /
+ * Replied) and sort tabs (Newest / Oldest / Highest / Lowest). Each card
+ * has Reply (5-300 chars) and Delete actions.
+ */
 import { useState, useCallback } from 'react';
 import { View, Text, FlatList, StyleSheet, Image, Pressable, TextInput, ScrollView } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';

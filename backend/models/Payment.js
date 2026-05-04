@@ -1,3 +1,25 @@
+/**
+ * PAYMENT MODEL (Module M6)
+ * =========================
+ *
+ * One Payment per Order. Created in checkoutController.js after Stripe
+ * confirms (or, for COD, immediately with status='pending').
+ *
+ * Validations:
+ *   - customer/gem: required refs
+ *   - amount: required Number, ≥ 0
+ *   - stripeRef: required (for COD we generate "cod_<timestamp>_<rand>")
+ *   - status enum: pending | success | failed | refunded
+ *   - paymentMethod enum: card | cod
+ *   - source enum: direct | offer | bid
+ *
+ * Why we never store card details:
+ *   The mobile Stripe SDK creates a `paymentMethod` on Stripe's servers and
+ *   only sends us the opaque ID. We send that to Stripe; Stripe sends back
+ *   a PaymentIntent ID. We store the PaymentIntent ID, not the card.
+ *   That keeps us out of PCI-DSS scope.
+ */
+
 const mongoose = require('mongoose');
 
 const paymentSchema = new mongoose.Schema(

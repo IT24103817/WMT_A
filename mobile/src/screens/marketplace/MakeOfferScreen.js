@@ -1,3 +1,8 @@
+/**
+ * MakeOfferScreen — Offers (M3)
+ * Customer submits an offer amount on a listing where openForOffers=true.
+ * POSTs to /api/offers. The amount must be ≥ 0 (server validates).
+ */
 import { useState } from 'react';
 import { Text, View, StyleSheet } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';

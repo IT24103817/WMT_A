@@ -1,3 +1,9 @@
+/**
+ * CartScreen — Cart (M3)
+ * Shows cart items from CartContext. Each row has a qty stepper (capped
+ * at gem.stockQty), a Remove button, and a "Only N in stock" hint when at
+ * cap. Sticky checkout bar shows subtotal and routes to Checkout.
+ */
 import { View, Text, StyleSheet, FlatList, Image, Pressable } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import Screen from '../../components/Screen';

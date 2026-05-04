@@ -1,3 +1,11 @@
+/**
+ * InventoryFormScreen — Inventory (M1)
+ * Create-or-edit form. Posts multipart FormData to inventory.create() or
+ * inventory.update(). Photo picker supports up to 6 images, distinguishes
+ * "kept" existing URLs from freshly picked device files.
+ * Validations (client): name/type/colour/carats/stockQty required;
+ * carats > 0; stockQty ≥ 0. Server enforces the same.
+ */
 import { useState } from 'react';
 import { Text, View, StyleSheet, ScrollView, Image, Pressable } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';

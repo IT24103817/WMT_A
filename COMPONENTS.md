@@ -1,261 +1,415 @@
-# GemMarket — Per-Member Component Reference
+# Your Component — A Simple Guide
 
-For each module: **what it does · where the code lives · what's validated · which CRUD operations are wired · the tech-stack pieces involved**.
+This document is written **as if you are explaining it to a friend who has never seen the code**. For each module, you will find:
 
-This is the file your assignment marker will scan to confirm the work split. For viva sample questions, see [`VIVA_CHEATSHEET.md`](VIVA_CHEATSHEET.md).
+- **What it is** (in 1 sentence)
+- **What you can do with it** — every Create / Read / Update / Delete operation, what each one does, and which file holds it
+- **What's checked** — every validation rule, in plain words
+- **Where to look in the code** — exact file paths so you can open them in VS Code
+
+> Every important file in the codebase now has a comment block at the top explaining what it does. Open any file from the table below and the first 10–30 lines will tell you the same things this doc summarises.
+
+For viva questions and answers see [`VIVA_CHEATSHEET.md`](VIVA_CHEATSHEET.md).
+For setup instructions for your team see [`RUN_LOCALLY.md`](RUN_LOCALLY.md).
 
 ---
 
-## Stack overview (everyone should know)
+## How the system fits together (2-minute version)
 
-| Layer | Tech | Why |
-|---|---|---|
-| Mobile | **React Native** + **Expo SDK 54** | Single codebase for iOS + Android + web. Expo Go skips native builds entirely. |
-| Navigation | `@react-navigation/native` (stack + tabs) | Industry standard for RN. Drives auth-vs-app routing in [`mobile/src/navigation/RootNavigator.js`](mobile/src/navigation/RootNavigator.js) |
-| State | React Context + `AsyncStorage` | Auth ([`AuthContext.js`](mobile/src/context/AuthContext.js)) + cart ([`CartContext.js`](mobile/src/context/CartContext.js)). Persisted across reloads. |
-| HTTP | `axios` | Single instance in [`mobile/src/api/client.js`](mobile/src/api/client.js) attaches the JWT and translates 4xx/5xx into a `userMessage` field. |
-| Animations | `react-native-reanimated` v4 + `Animated.FadeInDown` | Hero animations, list staggers, scroll-driven parallax. |
-| Backend | **Node.js + Express** | Single `server.js` mounts all routes; central error middleware catches everything. |
-| ORM | `mongoose` 8 | Schemas in [`backend/models/`](backend/models/). Validators run on `.save()`. |
-| Database | **MongoDB Atlas** (free M0) | Replica set, supports transactions. |
-| Auth | `bcryptjs` + `jsonwebtoken` | Password hashed on register; JWT signed with `JWT_SECRET`, sent in `Authorization: Bearer <token>` header. |
-| File uploads | `multer` + `multer-storage-cloudinary` | Streams the upload directly to Cloudinary — Express never touches the bytes. |
-| Media CDN | **Cloudinary** | Images + video. URL stored on the doc; the file lives on their CDN. |
-| Payments | **Stripe (test mode)** + `@stripe/stripe-react-native` | PaymentIntent created server-side, confirmed with `paymentMethodId` from the SDK. |
-| Hosting | **Render** (web service, free tier) | Auto-deploys on `git push`. Sleeps after 15 min idle. |
+1. **Mobile app (React Native + Expo)** runs on the phone. Every screen is a React component in `mobile/src/screens/`.
+2. The app calls our **backend API (Node + Express)** at `https://wmt-a.onrender.com`. All API code is in `backend/`.
+3. The backend talks to **MongoDB Atlas** (the database) and to **Cloudinary** (where images live) and **Stripe** (for card payments).
+4. When a user logs in, the backend gives them a **JWT token**. The mobile app keeps it in `AsyncStorage` and sends it on every request.
+
+That's the whole picture. Every module below is just a different feature using the same pipes.
 
 ---
 
 ## Group · Authentication
 
-**What it does:** registers customers, logs them in, persists session across app reloads, and gates every other route by JWT.
+**What it is:** the login system. Lets people register, log in, and stay logged in across app reloads.
 
-| Layer | File | What's inside |
+### What you can do with it
+
+| Operation | Meaning | Where the code is |
 |---|---|---|
-| Model | [`backend/models/User.js`](backend/models/User.js) | `name`, `email` (unique), `passwordHash`, `role` (`customer`\|`admin`), `lastAddress` (subdoc) |
-| Controller | [`backend/controllers/authController.js`](backend/controllers/authController.js) | `register`, `login`, `me` |
-| Middleware | [`backend/middleware/auth.js`](backend/middleware/auth.js) | Verifies JWT, loads `req.user` (sets `_id`, `role`, `name`) |
-| Middleware | [`backend/middleware/adminOnly.js`](backend/middleware/adminOnly.js) | 403 if `req.user.role !== 'admin'` |
-| Routes | [`backend/routes/auth.js`](backend/routes/auth.js) | `POST /api/auth/register`, `POST /api/auth/login`, `GET /api/auth/me` |
-| Mobile context | [`mobile/src/context/AuthContext.js`](mobile/src/context/AuthContext.js) | Stores `{ user, token }` in `AsyncStorage`; hydrates on app launch; exposes `login`, `logout`, `register` |
-| Screens | [`mobile/src/screens/auth/LoginScreen.js`](mobile/src/screens/auth/LoginScreen.js), [`mobile/src/screens/auth/RegisterScreen.js`](mobile/src/screens/auth/RegisterScreen.js) | Forms with client-side validation |
-| Navigation | [`mobile/src/navigation/RootNavigator.js`](mobile/src/navigation/RootNavigator.js) | Picks Auth stack vs Customer/Admin tabs based on token presence + role |
+| **CREATE (register)** | Make a new customer account | [`backend/controllers/authController.js`](backend/controllers/authController.js) → `register` |
+| **READ (login)** | Check email + password and give back a token | `authController.js` → `login` |
+| **READ (me)** | Tell the app who is currently logged in | `authController.js` → `me` |
 
-**CRUD:** Create (register), Read (me — read own profile), Update/Delete = N/A by design (academic scope).
+> There is no Update or Delete for users in this scope — accounts cannot be edited or deleted by design (academic project).
 
-**Validations:**
-- Email is required + valid + unique (`schema.unique` + duplicate-key error mapped to 409)
-- Password ≥ 6 chars on register
-- `bcrypt.compare` on login; failure returns generic 401 `"Invalid credentials"` (don't leak whether email exists)
-- JWT signature verified on every protected request; token expiry honoured
+### What's checked
 
-**Stack-specific gotchas:**
-- Token is loaded from AsyncStorage in `AuthContext` and attached by the axios interceptor in `client.js`.
-- On app reload the user appears logged in even before the network has confirmed — the `me` call refreshes the user; if it 401s, we log them out.
+When **registering**:
+- name, email, password are all **required**
+- password must be **at least 6 characters**
+- email cannot be **already in use** (the database has a unique rule)
+
+When **logging in**:
+- email + password are **required**
+- if either is wrong, you get a generic message "Invalid credentials" — we don't say "wrong email" vs "wrong password" because that helps attackers guess valid emails
+
+The token is signed with a secret (`JWT_SECRET`) so nobody can fake one.
+
+### Where the files are
+
+| File | What it does |
+|---|---|
+| [`backend/models/User.js`](backend/models/User.js) | The User shape: name, email, passwordHash, role, lastAddress |
+| [`backend/controllers/authController.js`](backend/controllers/authController.js) | register / login / me |
+| [`backend/middleware/auth.js`](backend/middleware/auth.js) | Reads the token on every protected request |
+| [`backend/middleware/adminOnly.js`](backend/middleware/adminOnly.js) | Adds an admin check on top of auth |
+| [`backend/routes/auth.js`](backend/routes/auth.js) | Connects the URLs to the functions |
+| [`mobile/src/context/AuthContext.js`](mobile/src/context/AuthContext.js) | Keeps user + token in memory + AsyncStorage |
+| [`mobile/src/screens/auth/LoginScreen.js`](mobile/src/screens/auth/LoginScreen.js) | The login form |
+| [`mobile/src/screens/auth/RegisterScreen.js`](mobile/src/screens/auth/RegisterScreen.js) | The signup form |
+| [`mobile/src/navigation/RootNavigator.js`](mobile/src/navigation/RootNavigator.js) | Decides Auth vs Customer vs Admin tabs |
 
 ---
 
 ## M1 · Inventory (Gem)
 
-**What it does:** admin-only CRUD over the central gem catalog. Every other module joins to a `Gem` document for its specs and photos.
+**What it is:** the **catalog**. Every gem in the shop lives here. Listings, bids and orders all point at one of these gems.
 
-| Layer | File | What's inside |
-|---|---|---|
-| Model | [`backend/models/Gem.js`](backend/models/Gem.js) | `name`, `type`, `colour`, `carats`, `stockQty`, `isAvailable`, `photos: [String]` (max 6 Cloudinary URLs) |
-| Controller | [`backend/controllers/inventoryController.js`](backend/controllers/inventoryController.js) | `list`, `get`, `create`, `update`, `remove` |
-| Middleware | [`backend/middleware/upload.js`](backend/middleware/upload.js) | `gemPhotosUpload` — multer + Cloudinary, `array('photos', 6)` |
-| Routes | [`backend/routes/inventory.js`](backend/routes/inventory.js) | All routes wrap `auth + adminOnly` |
-| Screens | [`mobile/src/screens/inventory/InventoryListScreen.js`](mobile/src/screens/inventory/InventoryListScreen.js), [`mobile/src/screens/inventory/InventoryFormScreen.js`](mobile/src/screens/inventory/InventoryFormScreen.js) | List + form (create/edit) with photo picker (kept vs new differentiation) |
+### What you can do with it
 
-**CRUD:**
-- **Create** — `POST /api/inventory` (multipart, optional photos[])
-- **Read all** — `GET /api/inventory`
-- **Read one** — `GET /api/inventory/:id`
-- **Update** — `PUT /api/inventory/:id` (handles photos kept-vs-new)
-- **Delete** — `DELETE /api/inventory/:id` (hard delete after confirm)
+| Operation | Meaning | URL | Where the code is |
+|---|---|---|---|
+| **CREATE** | Add a new gem with photos | `POST /api/inventory` | [`inventoryController.js`](backend/controllers/inventoryController.js) → `create` |
+| **READ all** | List every gem | `GET /api/inventory` | `inventoryController.js` → `list` |
+| **READ one** | Get a single gem | `GET /api/inventory/:id` | `inventoryController.js` → `get` |
+| **UPDATE** | Edit name / type / colour / carats / stock / photos | `PUT /api/inventory/:id` | `inventoryController.js` → `update` |
+| **DELETE** | Remove a gem permanently | `DELETE /api/inventory/:id` | `inventoryController.js` → `remove` |
 
-**Validations:**
-- Required: `name`, `type`, `colour`, `carats`, `stockQty`
-- `carats > 0`, `stockQty >= 0` (mongoose `min`)
-- `isAvailable` auto-derived: `gem.stockQty > 0` (set in pre-save / on stock decrement)
-- Max 6 photos; each must be `image/*` MIME (multer `fileFilter`); Cloudinary further restricts to JPG/PNG/HEIC/HEIF/WEBP/AVIF
+All five are **admin-only** — the route file wraps them with `auth + adminOnly` middleware.
 
-**Stack-specific gotchas:**
-- The `photos` array on the Gem is the **single source of truth** for visuals. Listings, orders, and bids all fall back to it via the helper `mobile/src/utils/photo.js`.
-- When `stockQty` is decremented to 0 in `finalizeSale`, the gem is flipped to `isAvailable=false` and the corresponding listing is closed.
+### What's checked
+
+When creating or updating:
+- **name, type, colour** are required
+- **carats** must be a number ≥ 0
+- **stockQty** must be ≥ 0 (defaults to 1)
+- You can attach **up to 6 photos**, each must be an image file (JPG / PNG / HEIC / WEBP / etc.) and **≤ 25 MB**
+- `isAvailable` is set automatically: true if `stockQty > 0`, false otherwise
+
+### Where the files are
+
+| File | What it does |
+|---|---|
+| [`backend/models/Gem.js`](backend/models/Gem.js) | The Gem shape + auto `isAvailable` rule |
+| [`backend/controllers/inventoryController.js`](backend/controllers/inventoryController.js) | All 5 CRUD operations |
+| [`backend/routes/inventory.js`](backend/routes/inventory.js) | Connects URLs to functions |
+| [`backend/middleware/upload.js`](backend/middleware/upload.js) | `gemPhotosUpload` — handles the 6 photo upload |
+| [`mobile/src/screens/inventory/AdminInventoryScreen.js`](mobile/src/screens/inventory/AdminInventoryScreen.js) | The list view |
+| [`mobile/src/screens/inventory/InventoryFormScreen.js`](mobile/src/screens/inventory/InventoryFormScreen.js) | The create/edit form |
 
 ---
 
 ## M2 · Learning Hub (Article)
 
-**What it does:** admin posts educational articles with cover images; customers browse by category and tap through to detail.
+**What it is:** educational articles like "How to buy a sapphire". Customers can read; admin can publish.
 
-| Layer | File | What's inside |
-|---|---|---|
-| Model | [`backend/models/Article.js`](backend/models/Article.js) | `title`, `category` (enum: `Gem Types`/`Buying Guide`/`Grading & Quality`/`Care & Maintenance`), `body`, `coverImageUrl`, `publishedAt` |
-| Controller | [`backend/controllers/learningController.js`](backend/controllers/learningController.js) | `list` (with optional `?category=`), `get`, `create`, `update`, `remove`, `categories` |
-| Middleware | [`backend/middleware/upload.js`](backend/middleware/upload.js) | `articleCoverUpload` — single image |
-| Routes | [`backend/routes/learning.js`](backend/routes/learning.js) | Public read, admin write (multipart for cover) |
-| Screens | `mobile/src/screens/learning/` | List with category filter chips, detail screen with "View related gems" CTA that prefills marketplace search |
+### What you can do with it
 
-**CRUD:**
-- **Create** — `POST /api/learning` (multipart with cover image)
-- **Read all** — `GET /api/learning?category=...`
-- **Read one** — `GET /api/learning/:id`
-- **Update** — `PUT /api/learning/:id`
-- **Delete** — `DELETE /api/learning/:id`
+| Operation | Meaning | URL | Where the code is |
+|---|---|---|---|
+| **CREATE** | Publish an article with a cover image | `POST /api/learning` | [`learningController.js`](backend/controllers/learningController.js) → `create` |
+| **READ all** | List articles (optional category filter) | `GET /api/learning?category=...` | `learningController.js` → `list` |
+| **READ one** | Open a single article | `GET /api/learning/:id` | `learningController.js` → `get` |
+| **UPDATE** | Edit title / category / body / cover | `PUT /api/learning/:id` | `learningController.js` → `update` |
+| **DELETE** | Remove an article | `DELETE /api/learning/:id` | `learningController.js` → `remove` |
 
-**Validations:**
-- `title`, `category`, `body` required
-- `category` must be one of the 4 enum values (mongoose enum validator)
-- Cover image: optional, must be `image/*`, single file (multer `single('cover')`)
+Reads are **public** (anyone can see). Writes are **admin-only**.
+
+### What's checked
+
+- **title, category, body** are required
+- **category** must be one of these 4 fixed values:
+  - "Gem Types"
+  - "Buying Guide"
+  - "Grading & Quality"
+  - "Care & Maintenance"
+- **cover image** is optional, must be `image/*` MIME, ≤ 25 MB
+
+### Where the files are
+
+| File | What it does |
+|---|---|
+| [`backend/models/Article.js`](backend/models/Article.js) | Article shape + the 4-category enum |
+| [`backend/controllers/learningController.js`](backend/controllers/learningController.js) | All 5 operations |
+| [`backend/routes/learning.js`](backend/routes/learning.js) | URL → function mapping |
+| [`mobile/src/screens/learning/LearningScreen.js`](mobile/src/screens/learning/LearningScreen.js) | Customer list with chip filters |
+| [`mobile/src/screens/learning/ArticleDetailScreen.js`](mobile/src/screens/learning/ArticleDetailScreen.js) | Customer read view |
+| [`mobile/src/screens/learning/AdminArticlesScreen.js`](mobile/src/screens/learning/AdminArticlesScreen.js) | Admin list |
+| [`mobile/src/screens/learning/ArticleFormScreen.js`](mobile/src/screens/learning/ArticleFormScreen.js) | Admin create/edit form |
 
 ---
 
-## M3 · Marketplace + Offers (Listing + Offer)
+## M3 · Marketplace + Offers
 
-**What it does:** admin publishes listings (one piece per listing, references a Gem). Customers browse with filters/sort, view detail, add to cart, or — for negotiable listings — submit an offer.
+**What it is:** the shop window. Listings are individual pieces for sale. Customers can buy directly (cart) or — if `openForOffers` is on — make an offer.
 
-| Layer | File | What's inside |
-|---|---|---|
-| Models | [`backend/models/Listing.js`](backend/models/Listing.js), [`backend/models/Offer.js`](backend/models/Offer.js) | Listing: `gem` ref, `price`, `description`, `videoUrl`, `openForOffers`, `status` (active/sold/removed). Offer: `listing`, `gem`, `customer`, `amount`, `status` (pending/accepted/rejected/paid) |
-| Controllers | [`backend/controllers/marketplaceController.js`](backend/controllers/marketplaceController.js), [`backend/controllers/offerController.js`](backend/controllers/offerController.js) | Marketplace: list/get/create/update/remove + sort modes (newest/price asc/desc/rating). Offers: customer create + list-mine; admin list + accept/reject |
-| Routes | [`backend/routes/marketplace.js`](backend/routes/marketplace.js), [`backend/routes/offers.js`](backend/routes/offers.js) | Public read + admin write for marketplace; auth required for offers |
-| Mobile | [`mobile/src/context/CartContext.js`](mobile/src/context/CartContext.js), `mobile/src/screens/marketplace/`, `mobile/src/screens/cart/` | Cart in AsyncStorage; sort chips on list; qty stepper capped at `gem.stockQty` |
+### Listings — what you can do
 
-**CRUD:**
+| Operation | Meaning | URL | Where the code is |
+|---|---|---|---|
+| **CREATE** | Put a gem up for sale | `POST /api/marketplace` | [`marketplaceController.js`](backend/controllers/marketplaceController.js) → `create` |
+| **READ all** | Browse all active listings (with sort + search) | `GET /api/marketplace` | `marketplaceController.js` → `list` |
+| **READ one** | Open a listing | `GET /api/marketplace/:id` | `marketplaceController.js` → `get` |
+| **UPDATE** | Change price / description / openForOffers | `PUT /api/marketplace/:id` | `marketplaceController.js` → `update` |
+| **DELETE** | Remove a listing (soft — status='removed') | `DELETE /api/marketplace/:id` | `marketplaceController.js` → `remove` |
 
-*Listings* — `GET /api/marketplace[?q=&category=&min=&max=&sort=]`, `GET /api/marketplace/:id`, `POST /api/marketplace` (multipart), `PUT /api/marketplace/:id`, `DELETE /api/marketplace/:id` (soft — sets `status='removed'`)
+### Offers — what you can do
 
-*Offers* — `POST /api/offers`, `GET /api/offers/mine`, `GET /api/offers` (admin), `PATCH /api/offers/:id` (action: accept|reject)
+| Operation | Meaning | URL | Where the code is |
+|---|---|---|---|
+| **CREATE** | Customer submits an offer amount | `POST /api/offers` | [`offerController.js`](backend/controllers/offerController.js) → `create` |
+| **READ mine** | Customer sees their own offers | `GET /api/offers/mine` | `offerController.js` → `mine` |
+| **READ all** | Admin sees every offer | `GET /api/offers` | `offerController.js` → `listAll` |
+| **UPDATE (decide)** | Admin accepts or rejects | `PATCH /api/offers/:id` | `offerController.js` → `decide` |
 
-**Validations:**
-- Listing: `gemId`, `price`, `description` required; `price >= 0`; `gem.stockQty > 0` enforced on create (`backend/controllers/marketplaceController.js` line ~45)
-- Listing status enum: `['active','sold','removed']`
-- Offer amount must be a positive number; the offer is rejected if listing is no longer `active` or not `openForOffers`
-- Cart qty capped at `gem.stockQty` both client-side (`CartContext.updateQty`) and server-side (`checkoutController.resolveItems`)
+> No DELETE — offers stay forever as a record. Pending offers auto-reject when a sibling offer is accepted + paid.
 
-**Stack-specific gotchas:**
-- Photos live on the **Gem**, not the Listing. The `listingPhoto` / `listingGallery` helpers in `mobile/src/utils/photo.js` fall back gem→listing.
-- When an offer is accepted, sibling pending offers stay pending until the customer actually pays — only at payment time does `finalizeSale` reject them. This avoids a deadlock if the customer never returns.
+### What's checked
+
+**Creating a listing:**
+- gemId, price, description **required**
+- price ≥ 0
+- the gem must exist with stockQty > 0
+
+**Creating an offer:**
+- listing must be **active** AND `openForOffers === true`
+- amount must be ≥ 0
+
+**Cart qty (added to cart on the mobile side):**
+- maximum is the gem's `stockQty` (the stepper won't let you go higher)
+- the server checks again at checkout in case stock changed
+
+**Sort modes** for browsing: newest, oldest, priceAsc, priceDesc, rating.
+
+### Where the files are
+
+| File | What it does |
+|---|---|
+| [`backend/models/Listing.js`](backend/models/Listing.js) | Listing shape (active/sold/removed) |
+| [`backend/models/Offer.js`](backend/models/Offer.js) | Offer shape (pending/accepted/rejected/paid) |
+| [`backend/controllers/marketplaceController.js`](backend/controllers/marketplaceController.js) | Listing CRUD + sort logic |
+| [`backend/controllers/offerController.js`](backend/controllers/offerController.js) | Offer create/list/decide |
+| [`mobile/src/context/CartContext.js`](mobile/src/context/CartContext.js) | Cart state + qty stepper logic |
+| [`mobile/src/screens/marketplace/MarketplaceScreen.js`](mobile/src/screens/marketplace/MarketplaceScreen.js) | Public list + sort chips |
+| [`mobile/src/screens/marketplace/GemDetailScreen.js`](mobile/src/screens/marketplace/GemDetailScreen.js) | Hero, Add to cart, Make offer, Reviews |
+| [`mobile/src/screens/marketplace/MakeOfferScreen.js`](mobile/src/screens/marketplace/MakeOfferScreen.js) | Customer offer form |
+| [`mobile/src/screens/cart/CartScreen.js`](mobile/src/screens/cart/CartScreen.js) | Cart with qty stepper |
+| [`mobile/src/screens/marketplace/AdminListingsScreen.js`](mobile/src/screens/marketplace/AdminListingsScreen.js) | Admin grid |
+| [`mobile/src/screens/marketplace/ListingFormScreen.js`](mobile/src/screens/marketplace/ListingFormScreen.js) | Admin create/edit |
 
 ---
 
 ## M4 · Orders + Reviews
 
-**What it does:** every successful checkout produces an Order tracked through 4 statuses (Confirmed → Processing → Out for Delivery → Delivered). Once delivered, the customer can post a Review with rating + tags + photos. Admin can reply.
+**What it is:** every paid checkout becomes an Order. The customer tracks it through 4 statuses. Once delivered, they can leave a Review with rating + tags + photos.
 
-| Layer | File | What's inside |
-|---|---|---|
-| Models | [`backend/models/Order.js`](backend/models/Order.js), [`backend/models/Review.js`](backend/models/Review.js) | Order: `items[]`, `subtotal`, `shippingFee`, `totalAmount`, `paymentMethod` (card/cod), `shippingAddress` subdoc, `status`, `payment` ref. Review: `gem`, `order`, `customer`, `rating` (1–5), `comment` (≤500), `photos[]` (≤3), `tags[]` (≤3 from 8-enum), `adminReply` subdoc |
-| Controllers | [`backend/controllers/orderController.js`](backend/controllers/orderController.js), [`backend/controllers/reviewController.js`](backend/controllers/reviewController.js) | Orders: mine/get/cancel/all/advance/cancelWithRefund. Reviews: byGem (sortable + filterable), aggregate, listAll, mine, sellerStats, tagsList, create, update (30-day window), remove, reply, removeReply |
-| Middleware | [`backend/middleware/upload.js`](backend/middleware/upload.js) | `reviewPhotosUpload` — `array('photos', 3)` |
-| Mobile | `mobile/src/screens/orders/`, `mobile/src/screens/reviews/` | OrdersScreen / OrderDetail with `StatusTracker` component, ReviewScreen + EditReviewScreen with tag picker + photo lightbox, AdminOrdersScreen with cancel-with-refund + update buttons, AdminReviewsScreen with sort/filter chips + reply |
+### Orders — what you can do
 
-**CRUD:**
+| Operation | Meaning | URL | Where the code is |
+|---|---|---|---|
+| **READ mine** | Customer's order history | `GET /api/orders` | [`orderController.js`](backend/controllers/orderController.js) → `mine` |
+| **READ one** | Open an order | `GET /api/orders/:id` | `orderController.js` → `get` |
+| **READ all** | Admin: every order | `GET /api/orders/all` | `orderController.js` → `listAll` |
+| **UPDATE** | Admin moves status forward | `PATCH /api/orders/:id` | `orderController.js` → `advance` |
+| **DELETE (cancel)** | Customer cancels a Confirmed order | `DELETE /api/orders/:id` | `orderController.js` → `cancel` |
+| **UPDATE (cancel + refund)** | Admin cancels + refunds via Stripe | `POST /api/orders/:id/cancel-refund` | `orderController.js` → `cancelWithRefund` |
 
-*Orders* — `GET /api/orders` (mine), `GET /api/orders/:id`, `DELETE /api/orders/:id` (cancel pre-dispatch), `POST /api/orders/:id/cancel-refund` (admin), `GET /api/orders/all` (admin), `PATCH /api/orders/:id` (admin advances status)
+> Orders are **created** by the checkout endpoint, not directly by this controller. See M6 below.
 
-*Reviews* — `GET /api/reviews/:gemId` (public, with `?sort=&tag=&withPhotos=`), `GET /api/reviews/:gemId/aggregate`, `GET /api/reviews/all` (admin), `GET /api/reviews/mine`, `GET /api/reviews/seller/stats`, `GET /api/reviews/tags/list`, `POST /api/reviews` (multipart, customer), `PUT /api/reviews/:id` (owner only, 30-day window), `DELETE /api/reviews/:id` (owner or admin), `POST /api/reviews/:id/reply` (admin), `DELETE /api/reviews/:id/reply` (admin)
+### Reviews — what you can do
 
-**Validations:**
-- Order status enum: `['Confirmed','Processing','Out for Delivery','Delivered','Cancelled']`
-- Customer can only cancel while status is `Confirmed` (orderController checks this; otherwise 409)
-- Review: rating must be **integer 1–5**; comment 0 chars OR 10–500; **no URLs** (anti-spam regex); **no all-caps** (≥8 letters all uppercase blocked); profanity blocklist; max 3 photos; max 3 tags from the 8 predefined; one review per `(order, customer)` (compound unique index in Mongo)
-- Review edit window: 30 days from `createdAt` (otherwise 409)
-- Admin reply: 5–300 chars
+| Operation | Meaning | URL | Where the code is |
+|---|---|---|---|
+| **CREATE** | Customer posts a review | `POST /api/reviews` | [`reviewController.js`](backend/controllers/reviewController.js) → `create` |
+| **READ by gem** | Public reviews for a gem (sort + filter) | `GET /api/reviews/:gemId` | `reviewController.js` → `byGem` |
+| **READ stats** | Avg, distribution, tag counts | `GET /api/reviews/:gemId/aggregate` | `reviewController.js` → `aggregateForGem` |
+| **READ mine** | Customer sees own reviews | `GET /api/reviews/mine` | `reviewController.js` → `mine` |
+| **READ all** | Admin moderation list | `GET /api/reviews/all` | `reviewController.js` → `listAll` |
+| **READ stats global** | Admin dashboard numbers | `GET /api/reviews/seller/stats` | `reviewController.js` → `sellerStats` |
+| **UPDATE** | Customer edits within 30 days | `PUT /api/reviews/:id` | `reviewController.js` → `update` |
+| **DELETE** | Customer or admin deletes | `DELETE /api/reviews/:id` | `reviewController.js` → `remove` |
+| **UPDATE (admin reply)** | Admin replies publicly | `POST /api/reviews/:id/reply` | `reviewController.js` → `reply` |
+| **DELETE (admin reply)** | Admin removes their reply | `DELETE /api/reviews/:id/reply` | `reviewController.js` → `removeReply` |
 
-**Stack-specific gotchas:**
-- The `Review` schema has a compound unique index `{ order: 1, customer: 1 }`. Mongo enforces it; trying to double-review yields a duplicate-key error mapped to 409 in the controller.
-- Cancel-with-refund (`POST /api/orders/:id/cancel-refund`) walks every item, restores `gem.stockQty`, reopens the listing if it was closed, reverts paid offers, and calls `stripe.refunds.create` for card payments. COD orders skip the Stripe call.
+### What's checked
+
+**Order status** must be one of: `Confirmed`, `Processing`, `Out for Delivery`, `Delivered`, `Cancelled`. Customer can only cancel from `Confirmed`.
+
+**Cancel + refund**:
+- Cannot cancel an order that is already `Cancelled` or `Delivered`
+- For card payments: actually calls Stripe to refund the money
+- Restores stock, reopens the listing, reverts paid offers — all in one transaction
+
+**Review create / update — every rule, in plain words:**
+
+| Rule | Why |
+|---|---|
+| Rating must be a whole number from 1 to 5 | Stars are integer |
+| Comment can be empty OR 10–500 characters | Stops one-letter spam, prevents very long rants |
+| Comment cannot contain a URL | Anti-spam — keeps reviews trustworthy |
+| Comment cannot be all-caps (≥ 8 letters all uppercase) | "Stop shouting" rule |
+| Comment cannot contain profanity from a blocklist | Family-friendly |
+| Maximum 3 photos per review | Keeps Cloudinary usage in check |
+| Maximum 3 tags from the 8 predefined "what went well" tags | Forces consistent labelling |
+| One review per (order, customer) | Stops vote-stacking — Mongo enforces with a compound unique index |
+| Edit only within 30 days of creation | Industry norm — stops surprise rating-change attacks on sellers |
+| Admin reply: 5–300 characters | Reasonable length for moderation |
+
+### Where the files are
+
+| File | What it does |
+|---|---|
+| [`backend/models/Order.js`](backend/models/Order.js) | Order shape: items[] + address + payment method + status |
+| [`backend/models/Review.js`](backend/models/Review.js) | Review shape + the 8 tags + adminReply subdoc |
+| [`backend/controllers/orderController.js`](backend/controllers/orderController.js) | Order reads + status updates + cancel logic |
+| [`backend/controllers/reviewController.js`](backend/controllers/reviewController.js) | All review operations + the validation helpers |
+| [`mobile/src/screens/orders/OrdersScreen.js`](mobile/src/screens/orders/OrdersScreen.js) | Customer history |
+| [`mobile/src/screens/orders/OrderDetailScreen.js`](mobile/src/screens/orders/OrderDetailScreen.js) | One order, with StatusTracker + Leave-a-review buttons |
+| [`mobile/src/screens/orders/AdminOrdersScreen.js`](mobile/src/screens/orders/AdminOrdersScreen.js) | Admin queue with Cancel + Update buttons |
+| [`mobile/src/screens/orders/AdminOrderUpdateScreen.js`](mobile/src/screens/orders/AdminOrderUpdateScreen.js) | Status picker |
+| [`mobile/src/screens/orders/ReviewScreen.js`](mobile/src/screens/orders/ReviewScreen.js) | Customer post-review form |
+| [`mobile/src/screens/reviews/MyReviewsScreen.js`](mobile/src/screens/reviews/MyReviewsScreen.js) | Customer's own reviews |
+| [`mobile/src/screens/reviews/EditReviewScreen.js`](mobile/src/screens/reviews/EditReviewScreen.js) | Edit own review |
+| [`mobile/src/screens/reviews/AdminReviewsScreen.js`](mobile/src/screens/reviews/AdminReviewsScreen.js) | Admin moderation with sort + filter |
+| [`mobile/src/components/StatusTracker.js`](mobile/src/components/StatusTracker.js) | The 4-step progress bar |
 
 ---
 
-## M5 · Bidding (Bid)
+## M5 · Bidding (Auctions)
 
-**What it does:** admin schedules an auction (now-or-later) with a start price and end time. Customers place increasing bids. When time runs out, the bid auto-closes on the next read (lazy close). The winner can pay through the standard checkout.
+**What it is:** time-limited auctions. Admin schedules them; customers place increasing bids; the winner pays through the same checkout flow.
 
-| Layer | File | What's inside |
-|---|---|---|
-| Model | [`backend/models/Bid.js`](backend/models/Bid.js) | `gem`, `startPrice`, `endTime`, `scheduledStartAt`, `description`, `currentHighest: { amount, customer }`, `history[]`, `status` (`scheduled`/`active`/`closed`/`cancelled`), `winner` |
-| Controller | [`backend/controllers/bidController.js`](backend/controllers/bidController.js) | `list`, `get`, `create`, `update`, `place`, `remove` — list/get **first call** lazyOpenBids + lazyCloseBids |
-| Utils | [`backend/utils/lazyOpenBids.js`](backend/utils/lazyOpenBids.js), [`backend/utils/lazyCloseBids.js`](backend/utils/lazyCloseBids.js) | Sweep: `scheduled` → `active` when `scheduledStartAt <= now`; `active` → `closed` (with `winner = currentHighest.customer`) when `endTime < now` |
-| Routes | [`backend/routes/bids.js`](backend/routes/bids.js) | Public list/get; customer place; admin create/update/remove |
-| Screens | `mobile/src/screens/bidding/` | BiddingScreen (list with countdown), BidDetailScreen (image gallery + place-bid form + winner pay CTA), BidFormScreen (mode toggle: live now vs scheduled), AdminBidsScreen |
+### What you can do with it
 
-**CRUD:**
-- **Create** — `POST /api/bids` (admin)
-- **Read all** — `GET /api/bids` (public; sweeps state first)
-- **Read one** — `GET /api/bids/:id`
-- **Update** — `PUT /api/bids/:id` (admin; description, scheduling)
-- **Place bid** — `POST /api/bids/:id/place` (customer)
-- **Delete** — `DELETE /api/bids/:id` (admin)
+| Operation | Meaning | URL | Where the code is |
+|---|---|---|---|
+| **CREATE** | Admin creates an auction (now or scheduled) | `POST /api/bids` | [`bidController.js`](backend/controllers/bidController.js) → `create` |
+| **READ all** | Browse auctions (sweeps state first) | `GET /api/bids` | `bidController.js` → `list` |
+| **READ one** | Open a single auction | `GET /api/bids/:id` | `bidController.js` → `get` |
+| **UPDATE** | Admin edits description / endTime / scheduling | `PUT /api/bids/:id` | `bidController.js` → `update` |
+| **UPDATE (place bid)** | Customer places a bid | `POST /api/bids/:id/place` | `bidController.js` → `place` |
+| **DELETE** | Admin cancels (only if not closed) | `DELETE /api/bids/:id` | `bidController.js` → `remove` |
 
-**Validations:**
-- `startPrice > 0`, `endTime > now` on create
-- Scheduled mode: `scheduledStartAt > now`, `endTime > scheduledStartAt`
-- Bid placed: `amount > currentHighest.amount` (or > startPrice if no bids); `now < endTime`; status === `active`
-- Status enum: `['scheduled','active','closed','cancelled']`
+### What's checked
 
-**Stack-specific gotchas:**
-- **Lazy close** is the architectural choice — Render free tier has no scheduled-cron, so we sweep on every read instead. Trade-off documented: a closed bid won't reflect that until someone views it.
-- After close, only `bid.winner` can complete the purchase; the checkout endpoint enforces this in `resolveItems`.
+**Creating an auction:**
+- gemId, startPrice, endTime are **required**
+- endTime must be **in the future**
+- if you set `scheduledStartAt`, it must be **before endTime** AND in the future
+- the gem must have stockQty > 0
+
+**Placing a bid:**
+- the auction must be **active** (not scheduled or closed)
+- the deadline must not have passed
+- your amount must be **strictly greater** than the current highest bid
+
+**Editing or deleting:**
+- a **closed** auction cannot be edited or deleted (it has a winner already)
+- a **cancelled** auction cannot be edited
+
+**The lifecycle (in plain English):**
+
+```
+SCHEDULED  →  ACTIVE  →  CLOSED
+                                ↳  winner pays via /api/checkout
+ACTIVE     →  CANCELLED   (admin pulled it before anyone won)
+```
+
+The status flips happen "lazily" — the server checks at the start of every read/place. There is no scheduled job (Render's free tier doesn't support cron).
+
+### Where the files are
+
+| File | What it does |
+|---|---|
+| [`backend/models/Bid.js`](backend/models/Bid.js) | Bid shape + history[] + currentHighest |
+| [`backend/controllers/bidController.js`](backend/controllers/bidController.js) | All bid operations + sweep call |
+| [`backend/utils/lazyOpenBids.js`](backend/utils/lazyOpenBids.js) | Flips scheduled → active |
+| [`backend/utils/lazyCloseBids.js`](backend/utils/lazyCloseBids.js) | Flips active → closed (records winner) |
+| [`mobile/src/screens/bidding/BiddingScreen.js`](mobile/src/screens/bidding/BiddingScreen.js) | Customer list with countdown |
+| [`mobile/src/screens/bidding/BidDetailScreen.js`](mobile/src/screens/bidding/BidDetailScreen.js) | Detail + place bid + winner CTA |
+| [`mobile/src/screens/bidding/BidFormScreen.js`](mobile/src/screens/bidding/BidFormScreen.js) | Admin create/edit (now/schedule toggle) |
+| [`mobile/src/screens/bidding/AdminBidsScreen.js`](mobile/src/screens/bidding/AdminBidsScreen.js) | Admin grid |
+| [`mobile/src/components/CountdownTimer.js`](mobile/src/components/CountdownTimer.js) | "2d 3h 15m" timer |
 
 ---
 
 ## M6 · Payment + Cloudinary + Deployment
 
-**What it does:** all three sale paths (cart / accepted offer / won bid) funnel through `/api/checkout`. The controller server-derives the total, calls Stripe (card) or skips (COD), creates a Payment doc, then calls `finalizeSale` to atomically create the Order + decrement stock + close the listing/offer/bid.
+**What it is:** the choke point that turns "I want to buy this" into a real Order. All three buying paths (cart, accepted offer, won bid) go through one endpoint: `POST /api/checkout`.
 
-This member also owns the **Cloudinary upload pipeline** (used by M2 covers, M1 photos, M4 review photos) and the **Render deployment**.
+### What you can do with it
 
-| Layer | File | What's inside |
-|---|---|---|
-| Model | [`backend/models/Payment.js`](backend/models/Payment.js) | `customer`, `gem` (legacy primary), `amount`, `stripeRef`, `status` (`pending`/`success`/`failed`/`refunded`), `paymentMethod` (card/cod), `refundRef`, `refundedAt`, `source`, `sourceId` |
-| Controllers | [`backend/controllers/checkoutController.js`](backend/controllers/checkoutController.js), [`backend/controllers/paymentController.js`](backend/controllers/paymentController.js) | Checkout: `resolveItems` → Stripe (or skip for COD) → Payment.create → `finalizeSale`. Payment: admin list/get |
-| Choke point | [`backend/utils/finalizeSale.js`](backend/utils/finalizeSale.js) | For each item: validate source, mark listing/offer/bid, decrement gem stock by `qty`, reject sibling pending offers, close listing if stock depleted (or always for offer/bid). Then create one `Order` |
-| Cloudinary config | [`backend/config/cloudinary.js`](backend/config/cloudinary.js) | `cloudinary.config()` from env vars |
-| Upload middleware | [`backend/middleware/upload.js`](backend/middleware/upload.js) | 4 instances: `articleCoverUpload`, `listingMediaUpload` (video), `gemPhotosUpload` (≤6), `reviewPhotosUpload` (≤3) |
-| Routes | [`backend/routes/checkout.js`](backend/routes/checkout.js), [`backend/routes/payments.js`](backend/routes/payments.js) | Customer checkout, admin payment list |
-| Mobile | `mobile/src/screens/cart/`, `mobile/src/screens/payment/` | CartScreen with qty stepper, CheckoutScreen with address form + payment-method selector, PaymentScreen with Stripe `<CardField>` and Confetti on success |
+| Operation | Meaning | URL | Where the code is |
+|---|---|---|---|
+| **CREATE (checkout)** | Pay & create an Order | `POST /api/checkout` | [`checkoutController.js`](backend/controllers/checkoutController.js) → `checkout` |
+| **READ all (admin)** | List every payment | `GET /api/payments` | [`paymentController.js`](backend/controllers/paymentController.js) → `list` |
+| **READ one (admin)** | One payment record | `GET /api/payments/:id` | `paymentController.js` → `get` |
 
-**CRUD:**
+> There is no Update or Delete on Payment. Refunds are handled by `orderController.cancelWithRefund` (M4 above).
 
-*Checkout* — `POST /api/checkout` (only Create — it's the orchestrator)
+### What's checked
 
-*Payments* — `GET /api/payments` (admin list), `GET /api/payments/:id` (admin)
+When you POST to `/api/checkout`:
+- `paymentMethod` must be either `card` or `cod`
+- `shippingAddress` must have **fullName, phone, line1, city, postalCode, country** (line2 + notes are optional)
+- For **card**: `paymentMethodId` (from Stripe SDK on the phone) is required
+- For **cart** source: every listing must be `active` AND `qty ≤ gem.stockQty`
+- For **offer** source: the offer must belong to you AND status === `accepted`
+- For **bid** source: the bid must be `closed` AND you must equal `winner`
 
-**Validations:**
-- `paymentMethod` must be `'card'` or `'cod'`
-- Card path requires `paymentMethodId` (from Stripe SDK)
-- `shippingAddress` requires `fullName`, `phone`, `line1`, `city`, `postalCode`, `country` (server-side `validateAddress`)
-- Cart qty validated against `gem.stockQty` per item
-- Offer source: must belong to user, must be `accepted`
-- Bid source: must be `closed`, user must equal `winner`
-- All amounts are server-derived — the client never sets `totalAmount`
+The total amount is **always recalculated on the server**. The mobile app cannot tamper with prices.
 
-**Stack-specific gotchas:**
-- **No card data ever touches our DB.** The mobile SDK creates a `paymentMethod` on Stripe's side; we only see the opaque ID.
-- `finalizeSale` is wrapped in try/catch — if anything fails after the Stripe charge succeeded, we mark the Payment as `failed` and rethrow. The PaymentIntent stays charged on Stripe; refund is the recovery path. (Mongoose transactions could make this tighter — documented as a known trade-off.)
-- The Cloudinary multer storage streams the file directly to Cloudinary; Express never buffers it on disk. The doc only ever stores the resulting `secure_url`.
+### What happens after a successful payment (one-by-one)
 
-**Deployment:**
-- Render web service · Root `backend/` · Build `npm install --legacy-peer-deps` · Start `node server.js`
-- Atlas IP allow-list set to `0.0.0.0/0` (academic project)
-- Auto-deploys on `git push origin main`
-- Free tier sleeps after 15 min idle — first request after sleep takes ~30s
+This is all done by [`backend/utils/finalizeSale.js`](backend/utils/finalizeSale.js):
+
+1. For each item in the cart:
+   - **Decrement** `gem.stockQty` by qty
+   - **Close** the listing (status='sold') — only if stock hits 0 (for direct purchases) OR always (for offer/bid sales since they're 1-of-a-kind)
+   - **Reject** any other pending offers on the same listing
+2. Create one **Order** document with all items + the shipping address + payment method
+3. Save the `lastAddress` on the user (for next checkout)
+
+### Where the files are
+
+| File | What it does |
+|---|---|
+| [`backend/models/Payment.js`](backend/models/Payment.js) | Payment shape (status enum: pending/success/failed/refunded) |
+| [`backend/controllers/checkoutController.js`](backend/controllers/checkoutController.js) | The one-and-only buy endpoint |
+| [`backend/controllers/paymentController.js`](backend/controllers/paymentController.js) | Admin reads |
+| [`backend/utils/finalizeSale.js`](backend/utils/finalizeSale.js) | The choke point that creates the Order |
+| [`backend/middleware/upload.js`](backend/middleware/upload.js) | All 4 Cloudinary uploaders (used by M1/M2/M4) |
+| [`backend/config/cloudinary.js`](backend/config/cloudinary.js) | Cloudinary config from env vars |
+| [`mobile/src/screens/cart/CheckoutScreen.js`](mobile/src/screens/cart/CheckoutScreen.js) | Address + payment method picker |
+| [`mobile/src/screens/payment/PaymentScreen.js`](mobile/src/screens/payment/PaymentScreen.js) | Stripe card collection + POST /api/checkout |
+
+### Why Cloudinary belongs to M6
+
+The same upload middleware is used by Inventory (M1), Learning (M2), and Reviews (M4). M6 owns the **pipeline** — the actual `multer-storage-cloudinary` setup in `upload.js`. The other modules just call the uploaders.
+
+### Deployment notes (also M6)
+
+- Hosted on **Render** (free tier) at `https://wmt-a.onrender.com`
+- Auto-deploys on every `git push origin main`
+- Free tier sleeps after 15 min idle — first request takes ~30 seconds to wake up
+- Atlas IP allow-list set to `0.0.0.0/0` (Render's IPs are not stable)
 
 ---
 
-## Cross-cutting / shared
+## Things every member should know
 
-| File | Used by | Note |
-|---|---|---|
-| [`backend/middleware/errorHandler.js`](backend/middleware/errorHandler.js) | every route | Maps mongoose validation errors → 400, duplicate-key → 409, JWT errors → 401, anything else → 500 |
-| [`backend/utils/generateOrderNumber.js`](backend/utils/generateOrderNumber.js) | `finalizeSale` | Produces a human-friendly `ORD-XXXXXX` |
-| [`backend/scripts/seedAdmin.js`](backend/scripts/seedAdmin.js) | once-off | Upserts `admin@gemmarket.local` from env vars |
-| [`backend/scripts/seedDemo.js`](backend/scripts/seedDemo.js) | optional | 2 customers + 4 gems with photos + sample delivered orders + 4 reviews. Idempotent. |
-| [`mobile/src/api/client.js`](mobile/src/api/client.js) | every screen | Axios instance, attaches JWT, normalises errors into `e.userMessage` |
-| [`mobile/src/utils/photo.js`](mobile/src/utils/photo.js) | M3, M4, M5 | `listingPhoto(listing)` falls back gem→listing; `listingGallery` merges both |
-| [`mobile/src/utils/upload.js`](mobile/src/utils/upload.js) | every multipart screen | `pickerAssetToFile` infers MIME from URI on iOS HEIC |
-| [`mobile/src/components/`](mobile/src/components/) | every screen | Reusable UI: Button, Card, Input, GradientButton, Toast, Skeleton, StarRating, StatusTracker, CountdownTimer, GemPicker, TagPicker, PhotoLightbox, Confetti |
+| Question | Short answer |
+|---|---|
+| Where is the JWT stored on the phone? | `AsyncStorage` under key `gm_token`. Read by `mobile/src/api/client.js`. |
+| How does the app know if I'm an admin? | `user.role === 'admin'` from `AuthContext`. RootNavigator picks tabs accordingly. |
+| What happens to images on delete? | Database records are removed/marked. Cloudinary assets stay (academic scope — we don't garbage collect). |
+| Why are some operations soft-delete? | So historical orders + reviews still display correctly even after the source is "removed". |
+| Where do validations live? | Two places. Schema-level (in `models/`) for shape rules, controller-level for business rules. The mobile form usually mirrors the server checks for instant feedback. |
+| What's special about `finalizeSale.js`? | It's the **single function** that all 3 sale paths flow through. If you only learn one backend file, learn that one. |

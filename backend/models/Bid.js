@@ -1,5 +1,26 @@
+/**
+ * BID MODEL (Module M5)
+ * =====================
+ *
+ * Auction state machine: scheduled → active → closed (winner declared)
+ *                        active → cancelled (admin pulled it)
+ *
+ * Validations:
+ *   - gem: required ref
+ *   - startPrice: required Number, ≥ 0
+ *   - endTime: required Date (controller checks > now on create)
+ *   - scheduledStartAt: optional Date; if set and in the future, status='scheduled'
+ *   - status enum: scheduled | active | closed | cancelled
+ *   - currentHighest.amount: must be > previous amount (enforced in controller.place)
+ *
+ * Lazy state:
+ *   The status field is updated by lazyOpenBids/lazyCloseBids utilities at
+ *   the start of every read. The DB snapshot may briefly lag reality.
+ */
+
 const mongoose = require('mongoose');
 
+// One row in the bid history. We append on every successful place call.
 const bidEntrySchema = new mongoose.Schema(
   {
     customer: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },

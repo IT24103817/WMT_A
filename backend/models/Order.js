@@ -1,8 +1,29 @@
+/**
+ * ORDER MODEL (Module M4)
+ * =======================
+ *
+ * One Order = one checkout. Can contain multiple items (multi-item cart).
+ * The items[] array hides the source heterogeneity — each item knows
+ * whether it came from a direct listing, an accepted offer, or a won bid.
+ *
+ * Validations:
+ *   - orderNumber: required, unique across the collection
+ *   - subtotal/totalAmount: required Numbers, ≥ 0
+ *   - paymentMethod: enum ['card', 'cod']
+ *   - status: enum (5 values, defaults to 'Confirmed')
+ *   - shippingAddress: required subfields fullName/phone/line1/city/postal/country
+ *
+ * Snapshot fields (gemNameSnapshot, photoSnapshot):
+ *   Captured at order creation time so the customer's order history still
+ *   displays correctly even if the gem is later deleted from inventory.
+ */
+
 const mongoose = require('mongoose');
 
 const ORDER_STATUSES = ['Confirmed', 'Processing', 'Out for Delivery', 'Delivered', 'Cancelled'];
 const PAYMENT_METHODS = ['card', 'cod'];
 
+// One line item inside an Order. Source can be 'direct' (cart), 'offer', or 'bid'.
 const orderItemSchema = new mongoose.Schema(
   {
     gem: { type: mongoose.Schema.Types.ObjectId, ref: 'Gem', required: true },

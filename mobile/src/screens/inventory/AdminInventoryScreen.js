@@ -1,3 +1,10 @@
+/**
+ * AdminInventoryScreen — Inventory (M1)
+ * Admin-only list of every gem in the catalog. Each row shows a thumbnail
+ * (gem.photos[0]), specs, stock, and Edit/Delete buttons. Pull-to-refresh
+ * re-fetches via inventory.list(). Edit → InventoryForm; Delete →
+ * inventory.remove() with a confirm dialog.
+ */
 import { useState, useCallback } from 'react';
 import { Text, FlatList, View, StyleSheet, Image } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';

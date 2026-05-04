@@ -1,3 +1,23 @@
+/**
+ * FINALIZE SALE (Module M6 — the choke-point)
+ * ============================================
+ *
+ * This is the SINGLE function that all 3 sale paths funnel through:
+ *   1. Direct cart purchase (source='direct')
+ *   2. Paid accepted offer  (source='offer')
+ *   3. Won bid              (source='bid')
+ *
+ * Why one function?
+ *   Each path has the SAME side effects:
+ *     - decrement the gem's stockQty by qty
+ *     - close the listing if stock depleted
+ *     - reject pending sibling offers
+ *     - create one Order document
+ *   Doing them in 3 separate places would be a maintenance nightmare and
+ *   would let inconsistencies creep in. The "choke point" pattern keeps
+ *   the rules in one file.
+ */
+
 const Gem = require('../models/Gem');
 const Listing = require('../models/Listing');
 const Offer = require('../models/Offer');

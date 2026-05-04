@@ -1,3 +1,9 @@
+/**
+ * LearningScreen — Learning Hub (M2)
+ * Customer view: list of articles, optional category filter chips
+ * (Gem Types / Buying Guide / Grading & Quality / Care & Maintenance).
+ * Calls learning.list({ category }).
+ */
 import { useState, useCallback } from 'react';
 import { View, Text, FlatList, StyleSheet, Image, ScrollView } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';

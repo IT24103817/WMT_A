@@ -1,3 +1,10 @@
+/**
+ * BiddingScreen — Auctions (M5)
+ * Public list of bids. Each card: gem photo, status badge (LIVE /
+ * SCHEDULED / ENDED), highest bid, countdown timer (active) or start
+ * date (scheduled). Calls bids.list(); the server runs the lazy state
+ * sweep before returning.
+ */
 import { useState, useCallback } from 'react';
 import { Text, FlatList, View, StyleSheet, Image } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';

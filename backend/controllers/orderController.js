@@ -1,3 +1,21 @@
+/**
+ * ORDER CONTROLLER (Module M4)
+ * ============================
+ * Module owner: M4 (Orders + Reviews)
+ *
+ * What this file does:
+ *   Orders are READ-mostly — they're created by the checkout controller
+ *   (see controllers/checkoutController.js + utils/finalizeSale.js). This
+ *   file handles:
+ *     - customer reads (their orders)
+ *     - admin reads (all orders) + status advancement
+ *     - cancellation (customer pre-dispatch, OR admin with refund)
+ *
+ * Order status flow:
+ *   Confirmed → Processing → Out for Delivery → Delivered
+ *   any of the above → Cancelled (customer can only cancel from 'Confirmed')
+ */
+
 const Stripe = require('stripe');
 const Order = require('../models/Order');
 const { ORDER_STATUSES } = require('../models/Order');
@@ -6,14 +24,21 @@ const Gem = require('../models/Gem');
 const Listing = require('../models/Listing');
 const Offer = require('../models/Offer');
 
+// Stripe is optional — if no key, refunds will skip and only COD-style
+// cancellations work. Production always has the key.
 const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY) : null;
 
+// Hydrate the references so the mobile app can render order cards in one
+// fetch (gem photo, listing title, payment method, etc).
 const populateOrder = (q) =>
   q.populate('items.gem')
    .populate('items.listing')
    .populate('customer', 'name email')
    .populate('payment');
 
+/**
+ * READ-mine → GET /api/orders   (customer)
+ */
 exports.mine = async (req, res, next) => {
   try {
     const orders = await populateOrder(Order.find({ customer: req.user._id }).sort({ createdAt: -1 }));
@@ -21,6 +46,10 @@ exports.mine = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+/**
+ * READ-one → GET /api/orders/:id   (customer or admin)
+ * Validation: customers can only read their own orders; admins can read any.
+ */
 exports.get = async (req, res, next) => {
   try {
     const order = await populateOrder(Order.findById(req.params.id));
@@ -36,6 +65,10 @@ exports.get = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+/**
+ * READ-all → GET /api/orders/all   (admin)
+ * Optional ?status filter.
+ */
 exports.listAll = async (req, res, next) => {
   try {
     const filter = {};
@@ -45,6 +78,11 @@ exports.listAll = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+/**
+ * UPDATE → PATCH /api/orders/:id   (admin)
+ * Advance the order status. Validation: status must be one of the 5 enum
+ * values defined on the Order model.
+ */
 exports.advance = async (req, res, next) => {
   try {
     const { status } = req.body;
@@ -59,6 +97,11 @@ exports.advance = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+/**
+ * DELETE (soft) → DELETE /api/orders/:id   (customer or admin)
+ * Validation: customers can only cancel from 'Confirmed' (before dispatch).
+ * Admin can cancel anytime, but for refunds they should use cancelWithRefund.
+ */
 exports.cancel = async (req, res, next) => {
   try {
     const order = await Order.findById(req.params.id);
@@ -79,8 +122,18 @@ exports.cancel = async (req, res, next) => {
 };
 
 /**
- * Admin cancel + refund. Walks every item and reverses inventory + listing
- * + offer side-effects, then refunds the customer via Stripe (skipped for COD).
+ * UPDATE (cancel + refund) → POST /api/orders/:id/cancel-refund   (admin)
+ * Walks every item in the order and reverses ALL side effects:
+ *   1. Restore gem.stockQty (and isAvailable)
+ *   2. Reopen the listing if it was 'sold'
+ *   3. Revert paid offers back to 'rejected' (frees the listing)
+ *   4. For card payments: call Stripe refunds.create
+ *   5. Mark Payment as 'refunded' with refundRef + refundedAt
+ *   6. Set order status to 'Cancelled'
+ *
+ * COD orders skip the Stripe call but still mark refunded for audit.
+ * If Stripe refund fails, we abort BEFORE touching inventory — keeps state
+ * consistent.
  */
 exports.cancelWithRefund = async (req, res, next) => {
   try {

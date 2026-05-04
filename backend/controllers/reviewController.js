@@ -1,3 +1,29 @@
+/**
+ * REVIEW CONTROLLER (Module M4)
+ * =============================
+ * Module owner: M4 (Orders + Reviews)
+ *
+ * What this file does:
+ *   Customer reviews of gems they've received. Includes rating, optional
+ *   comment, "what went well" tags, photos, and admin replies.
+ *
+ * Who can do what:
+ *   - Customer: post 1 review per delivered order, edit within 30 days,
+ *     delete their own review.
+ *   - Admin: list all, see seller stats, reply to a review, delete any.
+ *   - Public: read reviews on a gem with sort + filter.
+ *
+ * Validations live in two places:
+ *   - Schema (models/Review.js): rating range, photo cap, tag cap, unique
+ *     (order, customer)
+ *   - This controller: comment length, no URLs, no all-caps, profanity,
+ *     30-day edit window, reply length
+ *
+ * Why server-side hygiene checks?
+ *   Defense in depth. The mobile form already blocks bad input, but a
+ *   determined attacker could call the API directly.
+ */
+
 const mongoose = require('mongoose');
 const Review = require('../models/Review');
 const { REVIEW_TAGS } = require('../models/Review');
@@ -32,8 +58,13 @@ const SORT_MAP = {
   lowest: { rating: 1, createdAt: -1 },
 };
 
+/** Helper → GET /api/reviews/tags/list */
 exports.tagsList = (req, res) => res.json(REVIEW_TAGS);
 
+/**
+ * READ-by-gem → GET /api/reviews/:gemId   (public)
+ * Optional query: ?sort=newest|oldest|highest|lowest, ?tag=<one>, ?withPhotos=true
+ */
 exports.byGem = async (req, res, next) => {
   try {
     const filter = { gem: req.params.gemId };
@@ -54,6 +85,11 @@ exports.byGem = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+/**
+ * READ-stats → GET /api/reviews/:gemId/aggregate   (public)
+ * Returns avg + count + tagCounts + withPhotos count for the gem.
+ * Used by the gem detail screen to show a compact summary card.
+ */
 exports.aggregateForGem = async (req, res, next) => {
   try {
     const gemId = new mongoose.Types.ObjectId(req.params.gemId);
@@ -80,6 +116,10 @@ exports.aggregateForGem = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+/**
+ * READ-all → GET /api/reviews/all   (admin)
+ * Used by AdminReviewsScreen for moderation.
+ */
 exports.listAll = async (req, res, next) => {
   try {
     const reviews = await Review.find()
@@ -92,6 +132,10 @@ exports.listAll = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+/**
+ * READ-stats-global → GET /api/reviews/seller/stats   (admin)
+ * Avg rating + 1-5★ distribution + top tag mentions + 5 most recent reviews.
+ */
 exports.sellerStats = async (req, res, next) => {
   try {
     const [agg] = await Review.aggregate([
@@ -129,6 +173,21 @@ exports.sellerStats = async (req, res, next) => {
     });
   } catch (err) { next(err); }
 };
+
+/**
+ * CREATE → POST /api/reviews   (customer, multipart for photos)
+ *
+ * Validations applied:
+ *   1. orderId + rating required; rating must be integer 1–5
+ *   2. comment (if non-empty) must be 10–500 chars
+ *   3. comment cannot contain URLs (anti-spam)
+ *   4. comment cannot be all-caps (≥8 letters all upper)
+ *   5. comment cannot contain words from the profanity blocklist
+ *   6. order must belong to req.user AND status === 'Delivered'
+ *   7. only one review per (order, customer) — compound unique index
+ *   8. photos array max 3 (multer enforces; we double-check)
+ *   9. tags max 3, all from REVIEW_TAGS list
+ */
 
 // ---- Comment hygiene checks (server-side, defense-in-depth) ---------------
 const URL_RE = /\b(?:https?:\/\/|www\.)\S+/i;
@@ -205,6 +264,10 @@ exports.create = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+/**
+ * DELETE → DELETE /api/reviews/:id   (owner OR admin)
+ * Owner = the customer who wrote it. Admin can remove for moderation.
+ */
 exports.remove = async (req, res, next) => {
   try {
     const review = await Review.findById(req.params.id);
@@ -221,6 +284,16 @@ exports.remove = async (req, res, next) => {
 
 const EDIT_WINDOW_DAYS = 30;
 
+/**
+ * UPDATE → PUT /api/reviews/:id   (owner only, multipart)
+ * Validations:
+ *   - only the original author can edit
+ *   - within 30 days of creation (industry standard window)
+ *   - rating: integer 1–5
+ *   - comment: same rules as create
+ *   - tags: max 3, all from REVIEW_TAGS
+ *   - photos: new files REPLACE entirely; OR keepPhotos JSON keeps a subset
+ */
 exports.update = async (req, res, next) => {
   try {
     const review = await Review.findById(req.params.id);
@@ -272,6 +345,10 @@ exports.update = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+/**
+ * READ-mine → GET /api/reviews/mine   (customer)
+ * Lets a customer see all reviews they've posted (the "My Reviews" tab).
+ */
 exports.mine = async (req, res, next) => {
   try {
     const reviews = await Review.find({ customer: req.user._id })
@@ -285,6 +362,11 @@ exports.mine = async (req, res, next) => {
 
 // ---- Admin reply ----------------------------------------------------------
 
+/**
+ * UPDATE (admin reply) → POST /api/reviews/:id/reply   (admin)
+ * Adds an embedded `adminReply: { text, by, repliedAt }` subdocument.
+ * Validation: text 5–300 chars after trim.
+ */
 exports.reply = async (req, res, next) => {
   try {
     const raw = req.body?.text;
@@ -307,6 +389,10 @@ exports.reply = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+/**
+ * DELETE (admin reply) → DELETE /api/reviews/:id/reply   (admin)
+ * Clears the embedded reply.
+ */
 exports.removeReply = async (req, res, next) => {
   try {
     const review = await Review.findById(req.params.id);

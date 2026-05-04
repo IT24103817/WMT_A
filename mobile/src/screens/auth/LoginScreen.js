@@ -1,3 +1,9 @@
+/**
+ * LoginScreen — Auth (Group module)
+ * Form for existing users. Calls AuthContext.login() which posts to
+ * /api/auth/login and stores the JWT. RootNavigator then swaps to the
+ * customer/admin tabs based on user.role.
+ */
 import { useState } from 'react';
 import { View, Text, StyleSheet, KeyboardAvoidingView, Platform, Pressable } from 'react-native';
 import Animated, { FadeIn, FadeInDown, FadeInUp } from 'react-native-reanimated';

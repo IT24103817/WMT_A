@@ -1,3 +1,8 @@
+/**
+ * AdminArticlesScreen — Learning Hub (M2)
+ * Admin-only list with Create / Edit / Delete actions. Calls
+ * learning.list/create/update/remove.
+ */
 import { useState, useCallback } from 'react';
 import { Text, FlatList, View, StyleSheet, Image } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';

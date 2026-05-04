@@ -1,3 +1,9 @@
+/**
+ * MarketplaceScreen — Marketplace (M3)
+ * Public list of active listings. Search box + sort chips
+ * (newest / price↑ / price↓ / top rated). Pull-to-refresh + chip filters
+ * call marketplace.list({ q, sort }).
+ */
 import { useState, useCallback, useEffect } from 'react';
 import { View, Text, FlatList, StyleSheet, Image, TextInput, Platform, Pressable, ScrollView } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
