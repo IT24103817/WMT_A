@@ -1,0 +1,71 @@
+# ---- Dependencies ----------------------------------------------------------
+node_modules/
+.pnp
+.pnp.*
+.yarn/
+.yarn-integrity
+npm-debug.log*
+yarn-error.log*
+yarn-debug.log*
+
+# ---- Secrets (never commit) -----------------------------------------------
+# .env.example files DO ship — only the actual secrets are ignored.
+.env
+.env.local
+.env.development
+.env.development.local
+.env.test
+.env.test.local
+.env.production
+.env.production.local
+*.pem
+
+# ---- Expo / React Native --------------------------------------------------
+.expo/
+.expo-shared/
+dist/
+web-build/
+ios/
+android/
+*.apk
+*.aab
+*.ipa
+*.jks
+.metro-health-check*
+metro.cache/
+
+# ---- Builds ---------------------------------------------------------------
+build/
+*.tsbuildinfo
+
+# ---- Logs -----------------------------------------------------------------
+*.log
+logs/
+debug.log
+combined.log
+
+# ---- OS noise -------------------------------------------------------------
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# ---- Editors --------------------------------------------------------------
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ---- Tests / coverage -----------------------------------------------------
+coverage/
+e2e/playwright-report/
+e2e/test-results/
+e2e/playwright/.cache/
+e2e/
+# ---- Misc -----------------------------------------------------------------
+.claude/
+*.tmp
+*.temp
+docs/
+Files/
