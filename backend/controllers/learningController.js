@@ -1,6 +1,7 @@
 const Article = require('../models/Article');
 const { ARTICLE_CATEGORIES } = require('../models/Article');
 
+// Get list of articles
 exports.list = async (req, res, next) => {
   try {
     const filter = {};
@@ -10,6 +11,7 @@ exports.list = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+// Get article by ID
 exports.get = async (req, res, next) => {
   try {
     const article = await Article.findById(req.params.id);
@@ -18,6 +20,7 @@ exports.get = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+// Create new article (admin only)
 exports.create = async (req, res, next) => {
   try {
     const { title, category, body } = req.body;
@@ -41,6 +44,7 @@ exports.create = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+// Update article (admin only)
 exports.update = async (req, res, next) => {
   try {
     const article = await Article.findById(req.params.id);
@@ -59,6 +63,7 @@ exports.update = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+// Delete article (admin only)
 exports.remove = async (req, res, next) => {
   try {
     const article = await Article.findByIdAndDelete(req.params.id);
@@ -67,4 +72,5 @@ exports.remove = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+// Get list of article categories
 exports.categories = (req, res) => res.json(ARTICLE_CATEGORIES);

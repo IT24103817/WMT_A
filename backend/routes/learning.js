@@ -1,10 +1,10 @@
 const router = require('express').Router();
 const auth = require('../middleware/auth');
 const adminOnly = require('../middleware/adminOnly');
-const { articleCoverUpload } = require('../middleware/upload');
-const ctrl = require('../controllers/learningController');
+const { articleCoverUpload } = require('../middleware/upload'); // Middleware to handle article cover image uploads
+const ctrl = require('../controllers/learningController'); // Import the learning controller
 
-router.get('/categories', ctrl.categories);
+router.get('/categories', ctrl.categories); //public (Access to anyone)
 router.get('/', ctrl.list);
 router.get('/:id', ctrl.get);
 
